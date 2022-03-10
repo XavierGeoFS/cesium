@@ -205,12 +205,8 @@ vec4 sampleAndBlend(
     float alpha = value.a;
 
     #ifdef APPLY_MATERIAL
-    if (textureAlpha > 0.0) {
-        // itterate over the layerColor array to check for matching layerIndex and send color value to materialInput
-        //TODO: Find a different way to set pass layerColor values. Here, only the first two layers are handled as this loop leads to performance problems (shaders compilation time)
-        for (int i = 0; i < czm_layerColorNumber; i++) {
-            if (i == layerIndex) {materialInput.layerColor[i] = value; break;}
-        }
+    if (textureAlpha > 0.0 && layerIndex == 1) {
+        materialInput.layerColor = value;
     }
     #endif
 
