@@ -330,6 +330,7 @@ GlobeSurfaceShaderSet.prototype.getShaderProgram = function (options) {
       }
       computeDayColor += `\
             color,\n\
+            u_layerIndex[${i}],\n\
             u_dayTextures[${i}],\n\
             u_dayTextureUseWebMercatorT[${i}] ? textureCoordinates.xz : textureCoordinates.xy,\n\
             u_dayTextureTexCoordsRectangle[${i}],\n\
