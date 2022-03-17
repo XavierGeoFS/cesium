@@ -393,19 +393,6 @@ void main()
     }
 #endif
 
-#ifdef APPLY_MATERIAL
-    materialInput.st = v_textureCoordinates.st;
-    materialInput.normalEC = normalize(v_normalEC);
-    materialInput.positionToEyeEC = -v_positionEC;
-    materialInput.tangentToEyeMatrix = czm_eastNorthUpToEyeCoordinates(v_positionMC, normalize(v_normalEC));
-    materialInput.slope = v_slope;
-    materialInput.height = v_height;
-    materialInput.aspect = v_aspect;
-    czm_material material = czm_getMaterial(materialInput);
-    vec4 materialColor = vec4(material.diffuse, material.alpha);
-    color = alphaBlend(materialColor, color);
-#endif
-
 #ifdef ENABLE_VERTEX_LIGHTING
     float diffuseIntensity = clamp(czm_getLambertDiffuse(czm_lightDirectionEC, normalize(v_normalEC)) * u_lambertDiffuseMultiplier + 0.3, 0.0, 1.0);
     vec4 finalColor = vec4(color.rgb * czm_lightColor * diffuseIntensity, color.a);
@@ -416,6 +403,19 @@ void main()
 #else
     vec4 finalColor = color;
 #endif
+
+#ifdef APPLY_MATERIAL
+    materialInput.st = v_textureCoordinates.st;
+    materialInput.normalEC = normalize(v_normalEC);
+    materialInput.positionToEyeEC = -v_positionEC;
+    materialInput.tangentToEyeMatrix = czm_eastNorthUpToEyeCoordinates(v_positionMC, normalize(v_normalEC));
+    materialInput.slope = v_slope;
+    materialInput.height = v_height;
+    materialInput.aspect = v_aspect;
+    czm_material material = czm_getMaterial(materialInput);
+    vec4 materialColor = vec4(material.diffuse, material.alpha);
+    finalColor = alphaBlend(materialColor, finalColor);
+    #endif
 
 #ifdef ENABLE_CLIPPING_PLANES
     vec4 clippingPlanesEdgeColor = vec4(1.0);
