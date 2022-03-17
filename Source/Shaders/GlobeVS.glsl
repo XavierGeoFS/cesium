@@ -19,6 +19,10 @@ uniform mat4 u_modifiedModelView;
 uniform mat4 u_modifiedModelViewProjection;
 uniform vec4 u_tileRectangle;
 
+// Uniform set by GeoFS globe material
+uniform vec3 windVector_0;
+uniform float geofsTime_1;
+
 // Uniforms for 2D Mercator projection
 uniform vec2 u_southAndNorthLatitude;
 uniform vec2 u_southMercatorYAndOneOverHeight;
@@ -185,6 +189,24 @@ void main()
     position3DWC += offset;
     height = newHeight;
 #endif
+
+    // GEOFS waves
+    if (height == 0.0) {
+
+        vec3 normPositionMC = normalize(position3DWC);
+        vec3 surfaceNormal = normPositionMC;
+        vec2 positionSurfaceC = vec2( surfaceNormal.y / surfaceNormal.x ,  surfaceNormal.z );
+
+        //float twoPi = 6.283185307179586; // same precision as JS
+
+        float windFactor = length(windVector_0);
+        float waveAmplitude = windFactor * 5.0;
+        float time = geofsTime_1 * 0.001;
+
+        vec2 amplitude = vec2(sin(mod(positionSurfaceC.x * 20000.0 + time, czm_twoPi)) + 1.0, sin(mod(positionSurfaceC.y * 100000.0 + time, czm_twoPi)) + 1.0) * waveAmplitude;
+        position += normPositionMC * amplitude.x * amplitude.y;
+        v_normalMC = normalize(vec3(amplitude.xy, 3.0));
+    }
 
     gl_Position = getPosition(position, height, textureCoordinates);
 
