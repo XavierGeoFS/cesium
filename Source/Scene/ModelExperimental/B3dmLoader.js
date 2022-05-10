@@ -5,8 +5,9 @@ import Cesium3DTileFeatureTable from "../Cesium3DTileFeatureTable.js";
 import Check from "../../Core/Check.js";
 import ComponentDatatype from "../../Core/ComponentDatatype.js";
 import defaultValue from "../../Core/defaultValue.js";
+import defer from "../../Core/defer.js";
 import defined from "../../Core/defined.js";
-import FeatureMetadata from "../FeatureMetadata.js";
+import StructuralMetadata from "../StructuralMetadata.js";
 import GltfLoader from "../GltfLoader.js";
 import Matrix4 from "../../Core/Matrix4.js";
 import MetadataClass from "../MetadataClass.js";
@@ -15,7 +16,6 @@ import ModelExperimentalUtility from "./ModelExperimentalUtility.js";
 import parseBatchTable from "../parseBatchTable.js";
 import PropertyTable from "../PropertyTable.js";
 import ResourceLoader from "../ResourceLoader.js";
-import when from "../../ThirdParty/when.js";
 import VertexAttributeSemantic from "../VertexAttributeSemantic.js";
 
 const B3dmLoaderState = {
@@ -50,6 +50,7 @@ const FeatureIdAttribute = ModelComponents.FeatureIdAttribute;
  * @param {Axis} [options.upAxis=Axis.Y] The up-axis of the glTF model.
  * @param {Axis} [options.forwardAxis=Axis.X] The forward-axis of the glTF model.
  * @param {Boolean} [options.loadAsTypedArray=false] Load all attributes as typed arrays instead of GPU buffers.
+ * @param {Boolean} [options.loadIndicesForWireframe=false] Load the index buffer as a typed array so wireframe indices can be created for WebGL1.
  */
 function B3dmLoader(options) {
   options = defaultValue(options, defaultValue.EMPTY_OBJECT);
@@ -67,6 +68,10 @@ function B3dmLoader(options) {
   const upAxis = defaultValue(options.upAxis, Axis.Y);
   const forwardAxis = defaultValue(options.forwardAxis, Axis.X);
   const loadAsTypedArray = defaultValue(options.loadAsTypedArray, false);
+  const loadIndicesForWireframe = defaultValue(
+    options.loadIndicesForWireframe,
+    false
+  );
 
   //>>includeStart('debug', pragmas.debug);
   Check.typeOf.object("options.b3dmResource", b3dmResource);
@@ -85,10 +90,11 @@ function B3dmLoader(options) {
   this._upAxis = upAxis;
   this._forwardAxis = forwardAxis;
   this._loadAsTypedArray = loadAsTypedArray;
+  this._loadIndicesForWireframe = loadIndicesForWireframe;
 
   this._state = B3dmLoaderState.UNLOADED;
 
-  this._promise = when.defer();
+  this._promise = defer();
 
   this._gltfLoader = undefined;
 
@@ -214,6 +220,7 @@ B3dmLoader.prototype.load = function () {
     releaseGltfJson: this._releaseGltfJson,
     incrementallyLoadTextures: this._incrementallyLoadTextures,
     loadAsTypedArray: this._loadAsTypedArray,
+    loadIndicesForWireframe: this._loadIndicesForWireframe,
     renameBatchIdSemantic: true,
   });
 
@@ -230,13 +237,13 @@ B3dmLoader.prototype.load = function () {
 
       const components = gltfLoader.components;
       components.transform = that._transform;
-      createFeatureMetadata(that, components);
+      createStructuralMetadata(that, components);
       that._components = components;
 
       that._state = B3dmLoaderState.READY;
       that._promise.resolve(that);
     })
-    .otherwise(function (error) {
+    .catch(function (error) {
       if (that.isDestroyed()) {
         return;
       }
@@ -266,7 +273,7 @@ B3dmLoader.prototype.process = function (frameState) {
   }
 };
 
-function createFeatureMetadata(loader, components) {
+function createStructuralMetadata(loader, components) {
   const batchTable = loader._batchTable;
   const batchLength = loader._batchLength;
 
@@ -274,10 +281,10 @@ function createFeatureMetadata(loader, components) {
     return;
   }
 
-  let featureMetadata;
+  let structuralMetadata;
   if (defined(batchTable.json)) {
-    // Add the feature metadata from the batch table to the model components.
-    featureMetadata = parseBatchTable({
+    // Add the structural metadata from the batch table to the model components.
+    structuralMetadata = parseBatchTable({
       count: batchLength,
       batchTable: batchTable.json,
       binaryBody: batchTable.binary,
@@ -288,7 +295,7 @@ function createFeatureMetadata(loader, components) {
       name: MetadataClass.BATCH_TABLE_CLASS_NAME,
       count: batchLength,
     });
-    featureMetadata = new FeatureMetadata({
+    structuralMetadata = new StructuralMetadata({
       schema: {},
       propertyTables: [emptyPropertyTable],
     });
@@ -296,39 +303,34 @@ function createFeatureMetadata(loader, components) {
 
   // Add the feature ID attribute to the primitives.
   const nodes = components.scene.nodes;
-  for (let i = 0; i < nodes.length; i++) {
+  const length = nodes.length;
+  for (let i = 0; i < length; i++) {
     processNode(nodes[i]);
   }
-  components.featureMetadata = featureMetadata;
+  components.structuralMetadata = structuralMetadata;
 }
 
 // Recursive function to add the feature ID attribute to all primitives that have a feature ID vertex attribute.
 function processNode(node) {
-  if (!defined(node.children) && !defined(node.primitives)) {
-    return;
+  const childrenLength = node.children.length;
+  for (let i = 0; i < childrenLength; i++) {
+    processNode(node.children[i]);
   }
 
-  let i;
-  if (defined(node.children)) {
-    for (i = 0; i < node.children.length; i++) {
-      processNode(node.children[i]);
-    }
-  }
-
-  if (defined(node.primitives)) {
-    for (i = 0; i < node.primitives.length; i++) {
-      const primitive = node.primitives[i];
-      const featureIdVertexAttribute = ModelExperimentalUtility.getAttributeBySemantic(
-        primitive,
-        VertexAttributeSemantic.FEATURE_ID
-      );
-      if (defined(featureIdVertexAttribute)) {
-        featureIdVertexAttribute.setIndex = 0;
-        const featureIdAttribute = new FeatureIdAttribute();
-        featureIdAttribute.propertyTableId = 0;
-        featureIdAttribute.setIndex = 0;
-        primitive.featureIds.push(featureIdAttribute);
-      }
+  const primitivesLength = node.primitives.length;
+  for (let i = 0; i < primitivesLength; i++) {
+    const primitive = node.primitives[i];
+    const featureIdVertexAttribute = ModelExperimentalUtility.getAttributeBySemantic(
+      primitive,
+      VertexAttributeSemantic.FEATURE_ID
+    );
+    if (defined(featureIdVertexAttribute)) {
+      featureIdVertexAttribute.setIndex = 0;
+      const featureIdAttribute = new FeatureIdAttribute();
+      featureIdAttribute.propertyTableId = 0;
+      featureIdAttribute.setIndex = 0;
+      featureIdAttribute.positionalLabel = "featureId_0";
+      primitive.featureIds.push(featureIdAttribute);
     }
   }
 }

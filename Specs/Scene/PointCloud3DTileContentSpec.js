@@ -1,5 +1,6 @@
 import {
   Cartesian3,
+  Cesium3DContentGroup,
   Cesium3DTilePass,
   Cesium3DTileRefine,
   Cesium3DTileStyle,
@@ -7,6 +8,7 @@ import {
   ClippingPlaneCollection,
   Color,
   ComponentDatatype,
+  ContentMetadata,
   defined,
   DracoLoader,
   Expression,
@@ -17,8 +19,8 @@ import {
   GroupMetadata,
   Pass,
   PerspectiveFrustum,
+  RuntimeError,
   Transforms,
-  when,
 } from "../../Source/Cesium.js";
 import Cesium3DTilesTester from "../Cesium3DTilesTester.js";
 import createCanvas from "../createCanvas.js";
@@ -287,6 +289,7 @@ describe(
           tileset.style = new Cesium3DTileStyle({
             color: "vec4(Number(${secondaryColor}[0] < 1.0), 0.0, 0.0, 1.0)",
           });
+
           expect(scene).toRenderAndCall(function (rgba) {
             // Produces a red color
             expect(rgba[0]).toBeGreaterThan(rgba[1]);
@@ -315,26 +318,28 @@ describe(
     });
 
     it("error decoding a draco point cloud causes loading to fail", function () {
-      return pollToPromise(function () {
+      const readyPromise = pollToPromise(function () {
         return DracoLoader._taskProcessorReady;
-      }).then(function () {
-        const decoder = DracoLoader._getDecoderTaskProcessor();
-        spyOn(decoder, "scheduleTask").and.returnValue(
-          when.reject({ message: "my error" })
-        );
-        return Cesium3DTilesTester.loadTileset(scene, pointCloudDracoUrl).then(
-          function (tileset) {
-            const root = tileset.root;
-            return root.contentReadyPromise
-              .then(function () {
-                fail("should not resolve");
-              })
-              .otherwise(function (error) {
-                expect(error.message).toBe("my error");
-              });
-          }
-        );
       });
+      DracoLoader._getDecoderTaskProcessor();
+      return readyPromise
+        .then(function () {
+          const decoder = DracoLoader._getDecoderTaskProcessor();
+          spyOn(decoder, "scheduleTask").and.callFake(function () {
+            return Promise.reject({ message: "my error" });
+          });
+          return Cesium3DTilesTester.loadTileset(scene, pointCloudDracoUrl);
+        })
+        .then(function (tileset) {
+          const root = tileset.root;
+          return root.contentReadyPromise;
+        })
+        .then(function () {
+          fail("should not resolve");
+        })
+        .catch(function (error) {
+          expect(error.message).toBe("my error");
+        });
     });
 
     it("renders point cloud that are not defined relative to center", function () {
@@ -695,16 +700,19 @@ describe(
     });
 
     it("applies shader style", function () {
+      let tileset, content;
       return Cesium3DTilesTester.loadTileset(
         scene,
         pointCloudWithPerPointPropertiesUrl
-      ).then(function (tileset) {
-        const content = tileset.root.content;
+      ).then(function (t) {
+        tileset = t;
+        content = tileset.root.content;
 
         // Solid red color
         tileset.style = new Cesium3DTileStyle({
           color: 'color("red")',
         });
+
         expect(scene).toRender([255, 0, 0, 255]);
         expect(content._pointCloud._styleTranslucent).toBe(false);
 
@@ -712,6 +720,7 @@ describe(
         tileset.style = new Cesium3DTileStyle({
           color: "rgba(255, 0, 0, 0.005)",
         });
+
         expect(scene).toRenderAndCall(function (rgba) {
           // Pixel is a darker red
           expect(rgba[0]).toBeLessThan(255);
@@ -725,6 +734,7 @@ describe(
         tileset.style = new Cesium3DTileStyle({
           color: "color() * ${temperature}",
         });
+
         expect(scene).toRenderAndCall(function (rgba) {
           // Pixel color is some shade of gray
           expect(rgba[0]).toBe(rgba[1]);
@@ -741,6 +751,7 @@ describe(
             ],
           },
         });
+
         expect(scene).toRender([255, 255, 255, 255]);
 
         // Apply style with conditions
@@ -760,28 +771,33 @@ describe(
             ],
           },
         });
+
         expect(scene).notToRender([0, 0, 0, 255]);
 
         // Apply show style
         tileset.style = new Cesium3DTileStyle({
           show: true,
         });
+
         expect(scene).notToRender([0, 0, 0, 255]);
 
         // Apply show style that hides all points
         tileset.style = new Cesium3DTileStyle({
           show: false,
         });
+
         expect(scene).toRender([0, 0, 0, 255]);
 
         // Apply show style with property
         tileset.style = new Cesium3DTileStyle({
           show: "${temperature} > 0.1",
         });
+
         expect(scene).notToRender([0, 0, 0, 255]);
         tileset.style = new Cesium3DTileStyle({
           show: "${temperature} > 1.0",
         });
+
         expect(scene).toRender([0, 0, 0, 255]);
 
         // Apply style with point cloud semantics
@@ -789,12 +805,14 @@ describe(
           color: "${COLOR} / 2.0",
           show: "${POSITION}[0] > 0.5",
         });
+
         expect(scene).notToRender([0, 0, 0, 255]);
 
         // Apply pointSize style
         tileset.style = new Cesium3DTileStyle({
           pointSize: 5.0,
         });
+
         expect(scene).notToRender([0, 0, 0, 255]);
       });
     });
@@ -807,6 +825,7 @@ describe(
         tileset.style = new Cesium3DTileStyle({
           color: "color() * ${feature['temperature ℃']}",
         });
+
         expect(scene).toRenderAndCall(function (rgba) {
           // Pixel color is some shade of gray
           expect(rgba[0]).toBe(rgba[1]);
@@ -818,12 +837,15 @@ describe(
     });
 
     it("rebuilds shader style when expression changes", function () {
+      let tileset;
       return Cesium3DTilesTester.loadTileset(scene, pointCloudTilesetUrl).then(
-        function (tileset) {
+        function (t) {
+          tileset = t;
           // Solid red color
           tileset.style = new Cesium3DTileStyle({
             color: 'color("red")',
           });
+
           expect(scene).toRender([255, 0, 0, 255]);
 
           tileset.style.color = new Expression('color("lime")');
@@ -865,6 +887,7 @@ describe(
         tileset.style = new Cesium3DTileStyle({
           color: 'color("red")',
         });
+
         expect(scene).toRenderAndCall(function (rgba) {
           expect(rgba[0]).toBeGreaterThan(0);
           expect(rgba[0]).toBeLessThan(255);
@@ -880,6 +903,7 @@ describe(
         tileset.style = new Cesium3DTileStyle({
           color: 'color("red")',
         });
+
         expect(scene).toRenderAndCall(function (rgba) {
           expect(rgba[0]).toBeGreaterThan(0);
         });
@@ -892,6 +916,7 @@ describe(
           tileset.style = new Cesium3DTileStyle({
             color: 'color("red")',
           });
+
           expect(scene).toRender([255, 0, 0, 255]);
         }
       );
@@ -903,21 +928,24 @@ describe(
           tileset.style = new Cesium3DTileStyle({
             color: "${NORMAL}[0] > 0.5",
           });
+
           expect(function () {
             scene.renderForSpecs();
-          }).toThrowRuntimeError();
+          }).toThrowError(RuntimeError);
         }
       );
     });
 
     it("does not apply shader style if the point cloud has a batch table", function () {
+      let content, shaderProgram;
       return Cesium3DTilesTester.loadTileset(scene, pointCloudBatchedUrl).then(
         function (tileset) {
-          const content = tileset.root.content;
-          const shaderProgram = content._pointCloud._drawCommand.shaderProgram;
+          content = tileset.root.content;
+          shaderProgram = content._pointCloud._drawCommand.shaderProgram;
           tileset.style = new Cesium3DTileStyle({
             color: 'color("red")',
           });
+
           scene.renderForSpecs();
           expect(content._pointCloud._drawCommand.shaderProgram).toBe(
             shaderProgram
@@ -935,9 +963,10 @@ describe(
           tileset.style = new Cesium3DTileStyle({
             show: '1 < "2"',
           });
+
           expect(function () {
             scene.renderForSpecs();
-          }).toThrowRuntimeError();
+          }).toThrowError(RuntimeError);
         }
       );
     });
@@ -961,7 +990,7 @@ describe(
         1000 * 11, // 3 shorts (quantized xyz), 3 bytes (rgb), 2 bytes (oct-encoded normal)
       ];
 
-      return when.all(promises).then(function (tilesets) {
+      return Promise.all(promises).then(function (tilesets) {
         const length = tilesets.length;
         for (let i = 0; i < length; ++i) {
           const content = tilesets[i].root.content;
@@ -1170,37 +1199,83 @@ describe(
       return Cesium3DTilesTester.tileDestroys(scene, pointCloudRGBUrl);
     });
 
-    describe("3DTILES_metadata", function () {
-      const metadataClass = new MetadataClass({
-        id: "test",
-        class: {
-          properties: {
-            name: {
-              componentType: "STRING",
-            },
-            height: {
-              componentType: "FLOAT32",
+    describe("metadata", function () {
+      let metadataClass;
+      let groupMetadata;
+      let contentMetadataClass;
+      let contentMetadata;
+
+      beforeAll(function () {
+        metadataClass = new MetadataClass({
+          id: "test",
+          class: {
+            properties: {
+              name: {
+                type: "STRING",
+              },
+              height: {
+                type: "SCALAR",
+                componentType: "FLOAT32",
+              },
             },
           },
-        },
-      });
-      const groupMetadata = new GroupMetadata({
-        id: "testGroup",
-        group: {
-          properties: {
-            name: "Test Group",
-            height: 35.6,
+        });
+
+        groupMetadata = new GroupMetadata({
+          id: "testGroup",
+          group: {
+            properties: {
+              name: "Test Group",
+              height: 35.6,
+            },
           },
-        },
-        class: metadataClass,
+          class: metadataClass,
+        });
+
+        contentMetadataClass = new MetadataClass({
+          id: "contentTest",
+          class: {
+            properties: {
+              author: {
+                type: "STRING",
+              },
+              color: {
+                type: "VEC3",
+                componentType: "UINT8",
+              },
+            },
+          },
+        });
+
+        contentMetadata = new ContentMetadata({
+          content: {
+            properties: {
+              author: "Test Author",
+              color: [255, 0, 0],
+            },
+          },
+          class: contentMetadataClass,
+        });
       });
 
       it("assigns groupMetadata", function () {
         return Cesium3DTilesTester.loadTileset(scene, pointCloudRGBUrl).then(
           function (tileset) {
             const content = tileset.root.content;
-            content.groupMetadata = groupMetadata;
-            expect(content.groupMetadata).toBe(groupMetadata);
+            content.group = new Cesium3DContentGroup({
+              metadata: groupMetadata,
+            });
+            expect(content.group.metadata).toBe(groupMetadata);
+          }
+        );
+      });
+
+      it("assigns metadata", function () {
+        return Cesium3DTilesTester.loadTileset(scene, pointCloudRGBUrl).then(
+          function (tileset) {
+            const content = tileset.root.content;
+            content.metadata = contentMetadata;
+            expect(content.metadata).toBe(contentMetadata);
           }
         );
       });

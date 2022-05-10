@@ -48,192 +48,161 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   const styleUrl = "./Data/Cesium3DTiles/Style/style.json";
 
-  it("rejects readyPromise with undefined url", function () {
-    const tileStyle = new Cesium3DTileStyle("invalid.json");
-
-    return tileStyle.readyPromise
+  it("fromUrl rejects with undefined url", function () {
+    return Cesium3DTileStyle.fromUrl("invalid.json")
       .then(function (style) {
         fail("should not resolve");
       })
-      .otherwise(function (error) {
-        expect(tileStyle.ready).toEqual(false);
+      .catch(function (error) {
         expect(error.statusCode).toEqual(404);
       });
   });
 
   it("loads style from uri", function () {
-    const tileStyle = new Cesium3DTileStyle(styleUrl);
-
-    return tileStyle.readyPromise
-      .then(function (style) {
-        expect(style.style).toEqual({
-          color: "color('red')",
-          show: "${id} < 100.0",
-          pointSize: "${id} / 100.0",
-          pointOutlineColor: "color('blue')",
-          pointOutlineWidth: "5.0",
-          labelColor: "color('yellow')",
-          labelOutlineColor: "color('orange')",
-          labelOutlineWidth: "6.0",
-          font: "'24px Helvetica'",
-          labelStyle: "1",
-          labelText: "'label text'",
-          backgroundColor: "color('coral')",
-          backgroundPadding: "vec2(1.0, 2.0)",
-          backgroundEnabled: "true",
-          scaleByDistance: "vec4(1.0, 2.0, 3.0, 4.0)",
-          translucencyByDistance: "vec4(5.0, 6.0, 7.0, 8.0)",
-          distanceDisplayCondition: "vec2(3.0, 4.0)",
-          heightOffset: "10.0",
-          anchorLineEnabled: "true",
-          anchorLineColor: "color('fuchsia')",
-          image: "'url/to/invalid/image'",
-          disableDepthTestDistance: "1000.0",
-          horizontalOrigin: "0",
-          verticalOrigin: "0",
-          labelHorizontalOrigin: "0",
-          labelVerticalOrigin: "0",
-        });
-        expect(style.color).toEqual(new Expression("color('red')"));
-        expect(style.show).toEqual(new Expression("${id} < 100.0"));
-        expect(style.pointSize).toEqual(new Expression("${id} / 100.0"));
-        expect(style.pointOutlineColor).toEqual(
-          new Expression("color('blue')")
-        );
-        expect(style.pointOutlineWidth).toEqual(new Expression("5.0"));
-        expect(style.labelColor).toEqual(new Expression("color('yellow')"));
-        expect(style.labelOutlineColor).toEqual(
-          new Expression("color('orange')")
-        );
-        expect(style.labelOutlineWidth).toEqual(new Expression("6.0"));
-        expect(style.font).toEqual(new Expression("'24px Helvetica'"));
-        expect(style.labelStyle).toEqual(new Expression("1"));
-        expect(style.labelText).toEqual(new Expression("'label text'"));
-        expect(style.backgroundColor).toEqual(new Expression("color('coral')"));
-        expect(style.backgroundPadding).toEqual(
-          new Expression("vec2(1.0, 2.0)")
-        );
-        expect(style.backgroundEnabled).toEqual(new Expression("true"));
-        expect(style.scaleByDistance).toEqual(
-          new Expression("vec4(1.0, 2.0, 3.0, 4.0)")
-        );
-        expect(style.translucencyByDistance).toEqual(
-          new Expression("vec4(5.0, 6.0, 7.0, 8.0)")
-        );
-        expect(style.distanceDisplayCondition).toEqual(
-          new Expression("vec2(3.0, 4.0)")
-        );
-        expect(style.heightOffset).toEqual(new Expression("10.0"));
-        expect(style.anchorLineEnabled).toEqual(new Expression("true"));
-        expect(style.anchorLineColor).toEqual(
-          new Expression("color('fuchsia')")
-        );
-        expect(style.image).toEqual(new Expression("'url/to/invalid/image'"));
-        expect(style.disableDepthTestDistance).toEqual(
-          new Expression("1000.0")
-        );
-        expect(style.horizontalOrigin).toEqual(new Expression("0"));
-        expect(style.verticalOrigin).toEqual(new Expression("0"));
-        expect(style.labelHorizontalOrigin).toEqual(new Expression("0"));
-        expect(style.labelVerticalOrigin).toEqual(new Expression("0"));
-        expect(tileStyle.ready).toEqual(true);
-      })
-      .otherwise(function () {
-        fail("should load style.json");
+    return Cesium3DTileStyle.fromUrl(styleUrl).then(function (style) {
+      expect(style.style).toEqual({
+        color: "color('red')",
+        show: "${id} < 100.0",
+        pointSize: "${id} / 100.0",
+        pointOutlineColor: "color('blue')",
+        pointOutlineWidth: "5.0",
+        labelColor: "color('yellow')",
+        labelOutlineColor: "color('orange')",
+        labelOutlineWidth: "6.0",
+        font: "'24px Helvetica'",
+        labelStyle: "1",
+        labelText: "'label text'",
+        backgroundColor: "color('coral')",
+        backgroundPadding: "vec2(1.0, 2.0)",
+        backgroundEnabled: "true",
+        scaleByDistance: "vec4(1.0, 2.0, 3.0, 4.0)",
+        translucencyByDistance: "vec4(5.0, 6.0, 7.0, 8.0)",
+        distanceDisplayCondition: "vec2(3.0, 4.0)",
+        heightOffset: "10.0",
+        anchorLineEnabled: "true",
+        anchorLineColor: "color('fuchsia')",
+        image: "'url/to/invalid/image'",
+        disableDepthTestDistance: "1000.0",
+        horizontalOrigin: "0",
+        verticalOrigin: "0",
+        labelHorizontalOrigin: "0",
+        labelVerticalOrigin: "0",
       });
+      expect(style.color).toEqual(new Expression("color('red')"));
+      expect(style.show).toEqual(new Expression("${id} < 100.0"));
+      expect(style.pointSize).toEqual(new Expression("${id} / 100.0"));
+      expect(style.pointOutlineColor).toEqual(new Expression("color('blue')"));
+      expect(style.pointOutlineWidth).toEqual(new Expression("5.0"));
+      expect(style.labelColor).toEqual(new Expression("color('yellow')"));
+      expect(style.labelOutlineColor).toEqual(
+        new Expression("color('orange')")
+      );
+      expect(style.labelOutlineWidth).toEqual(new Expression("6.0"));
+      expect(style.font).toEqual(new Expression("'24px Helvetica'"));
+      expect(style.labelStyle).toEqual(new Expression("1"));
+      expect(style.labelText).toEqual(new Expression("'label text'"));
+      expect(style.backgroundColor).toEqual(new Expression("color('coral')"));
+      expect(style.backgroundPadding).toEqual(new Expression("vec2(1.0, 2.0)"));
+      expect(style.backgroundEnabled).toEqual(new Expression("true"));
+      expect(style.scaleByDistance).toEqual(
+        new Expression("vec4(1.0, 2.0, 3.0, 4.0)")
+      );
+      expect(style.translucencyByDistance).toEqual(
+        new Expression("vec4(5.0, 6.0, 7.0, 8.0)")
+      );
+      expect(style.distanceDisplayCondition).toEqual(
+        new Expression("vec2(3.0, 4.0)")
+      );
+      expect(style.heightOffset).toEqual(new Expression("10.0"));
+      expect(style.anchorLineEnabled).toEqual(new Expression("true"));
+      expect(style.anchorLineColor).toEqual(new Expression("color('fuchsia')"));
+      expect(style.image).toEqual(new Expression("'url/to/invalid/image'"));
+      expect(style.disableDepthTestDistance).toEqual(new Expression("1000.0"));
+      expect(style.horizontalOrigin).toEqual(new Expression("0"));
+      expect(style.verticalOrigin).toEqual(new Expression("0"));
+      expect(style.labelHorizontalOrigin).toEqual(new Expression("0"));
+      expect(style.labelVerticalOrigin).toEqual(new Expression("0"));
+    });
   });
 
-  it("loads style from Resource", function () {
-    const tileStyle = new Cesium3DTileStyle(
+  it("fromUrl loads style from Resource", function () {
+    return Cesium3DTileStyle.fromUrl(
       new Resource({
         url: styleUrl,
       })
-    );
-
-    return tileStyle.readyPromise
-      .then(function (style) {
-        expect(style.style).toEqual({
-          color: "color('red')",
-          show: "${id} < 100.0",
-          pointSize: "${id} / 100.0",
-          pointOutlineColor: "color('blue')",
-          pointOutlineWidth: "5.0",
-          labelColor: "color('yellow')",
-          labelOutlineColor: "color('orange')",
-          labelOutlineWidth: "6.0",
-          font: "'24px Helvetica'",
-          labelStyle: "1",
-          labelText: "'label text'",
-          backgroundColor: "color('coral')",
-          backgroundPadding: "vec2(1.0, 2.0)",
-          backgroundEnabled: "true",
-          scaleByDistance: "vec4(1.0, 2.0, 3.0, 4.0)",
-          translucencyByDistance: "vec4(5.0, 6.0, 7.0, 8.0)",
-          distanceDisplayCondition: "vec2(3.0, 4.0)",
-          heightOffset: "10.0",
-          anchorLineEnabled: "true",
-          anchorLineColor: "color('fuchsia')",
-          image: "'url/to/invalid/image'",
-          disableDepthTestDistance: "1000.0",
-          horizontalOrigin: "0",
-          verticalOrigin: "0",
-          labelHorizontalOrigin: "0",
-          labelVerticalOrigin: "0",
-        });
-        expect(style.color).toEqual(new Expression("color('red')"));
-        expect(style.show).toEqual(new Expression("${id} < 100.0"));
-        expect(style.pointSize).toEqual(new Expression("${id} / 100.0"));
-        expect(style.pointOutlineColor).toEqual(
-          new Expression("color('blue')")
-        );
-        expect(style.pointOutlineWidth).toEqual(new Expression("5.0"));
-        expect(style.labelColor).toEqual(new Expression("color('yellow')"));
-        expect(style.labelOutlineColor).toEqual(
-          new Expression("color('orange')")
-        );
-        expect(style.labelOutlineWidth).toEqual(new Expression("6.0"));
-        expect(style.font).toEqual(new Expression("'24px Helvetica'"));
-        expect(style.labelStyle).toEqual(new Expression("1"));
-        expect(style.labelText).toEqual(new Expression("'label text'"));
-        expect(style.backgroundColor).toEqual(new Expression("color('coral')"));
-        expect(style.backgroundPadding).toEqual(
-          new Expression("vec2(1.0, 2.0)")
-        );
-        expect(style.backgroundEnabled).toEqual(new Expression("true"));
-        expect(style.scaleByDistance).toEqual(
-          new Expression("vec4(1.0, 2.0, 3.0, 4.0)")
-        );
-        expect(style.translucencyByDistance).toEqual(
-          new Expression("vec4(5.0, 6.0, 7.0, 8.0)")
-        );
-        expect(style.distanceDisplayCondition).toEqual(
-          new Expression("vec2(3.0, 4.0)")
-        );
-        expect(style.heightOffset).toEqual(new Expression("10.0"));
-        expect(style.anchorLineEnabled).toEqual(new Expression("true"));
-        expect(style.anchorLineColor).toEqual(
-          new Expression("color('fuchsia')")
-        );
-        expect(style.image).toEqual(new Expression("'url/to/invalid/image'"));
-        expect(style.disableDepthTestDistance).toEqual(
-          new Expression("1000.0")
-        );
-        expect(style.horizontalOrigin).toEqual(new Expression("0"));
-        expect(style.verticalOrigin).toEqual(new Expression("0"));
-        expect(style.labelHorizontalOrigin).toEqual(new Expression("0"));
-        expect(style.labelVerticalOrigin).toEqual(new Expression("0"));
-        expect(tileStyle.ready).toEqual(true);
-      })
-      .otherwise(function () {
-        fail("should load style.json");
+    ).then(function (style) {
+      expect(style.style).toEqual({
+        color: "color('red')",
+        show: "${id} < 100.0",
+        pointSize: "${id} / 100.0",
+        pointOutlineColor: "color('blue')",
+        pointOutlineWidth: "5.0",
+        labelColor: "color('yellow')",
+        labelOutlineColor: "color('orange')",
+        labelOutlineWidth: "6.0",
+        font: "'24px Helvetica'",
+        labelStyle: "1",
+        labelText: "'label text'",
+        backgroundColor: "color('coral')",
+        backgroundPadding: "vec2(1.0, 2.0)",
+        backgroundEnabled: "true",
+        scaleByDistance: "vec4(1.0, 2.0, 3.0, 4.0)",
+        translucencyByDistance: "vec4(5.0, 6.0, 7.0, 8.0)",
+        distanceDisplayCondition: "vec2(3.0, 4.0)",
+        heightOffset: "10.0",
+        anchorLineEnabled: "true",
+        anchorLineColor: "color('fuchsia')",
+        image: "'url/to/invalid/image'",
+        disableDepthTestDistance: "1000.0",
+        horizontalOrigin: "0",
+        verticalOrigin: "0",
+        labelHorizontalOrigin: "0",
+        labelVerticalOrigin: "0",
       });
+      expect(style.color).toEqual(new Expression("color('red')"));
+      expect(style.show).toEqual(new Expression("${id} < 100.0"));
+      expect(style.pointSize).toEqual(new Expression("${id} / 100.0"));
+      expect(style.pointOutlineColor).toEqual(new Expression("color('blue')"));
+      expect(style.pointOutlineWidth).toEqual(new Expression("5.0"));
+      expect(style.labelColor).toEqual(new Expression("color('yellow')"));
+      expect(style.labelOutlineColor).toEqual(
+        new Expression("color('orange')")
+      );
+      expect(style.labelOutlineWidth).toEqual(new Expression("6.0"));
+      expect(style.font).toEqual(new Expression("'24px Helvetica'"));
+      expect(style.labelStyle).toEqual(new Expression("1"));
+      expect(style.labelText).toEqual(new Expression("'label text'"));
+      expect(style.backgroundColor).toEqual(new Expression("color('coral')"));
+      expect(style.backgroundPadding).toEqual(new Expression("vec2(1.0, 2.0)"));
+      expect(style.backgroundEnabled).toEqual(new Expression("true"));
+      expect(style.scaleByDistance).toEqual(
+        new Expression("vec4(1.0, 2.0, 3.0, 4.0)")
+      );
+      expect(style.translucencyByDistance).toEqual(
+        new Expression("vec4(5.0, 6.0, 7.0, 8.0)")
+      );
+      expect(style.distanceDisplayCondition).toEqual(
+        new Expression("vec2(3.0, 4.0)")
+      );
+      expect(style.heightOffset).toEqual(new Expression("10.0"));
+      expect(style.anchorLineEnabled).toEqual(new Expression("true"));
+      expect(style.anchorLineColor).toEqual(new Expression("color('fuchsia')"));
+      expect(style.image).toEqual(new Expression("'url/to/invalid/image'"));
+      expect(style.disableDepthTestDistance).toEqual(new Expression("1000.0"));
+      expect(style.horizontalOrigin).toEqual(new Expression("0"));
+      expect(style.verticalOrigin).toEqual(new Expression("0"));
+      expect(style.labelHorizontalOrigin).toEqual(new Expression("0"));
+      expect(style.labelVerticalOrigin).toEqual(new Expression("0"));
+    });
   });
 
   it("sets show value to undefined if value not present", function () {
     let style = new Cesium3DTileStyle({});
+
     expect(style.show).toBeUndefined();
 
     style = new Cesium3DTileStyle();
+
     expect(style.show).toBeUndefined();
   });
 
@@ -241,26 +210,31 @@ describe("Scene/Cesium3DTileStyle", function () {
     let style = new Cesium3DTileStyle({
       show: "true",
     });
+
     expect(style.show).toEqual(new Expression("true"));
 
     style = new Cesium3DTileStyle({
       show: "false",
     });
+
     expect(style.show).toEqual(new Expression("false"));
 
     style = new Cesium3DTileStyle({
       show: "${height} * 10 >= 1000",
     });
+
     expect(style.show).toEqual(new Expression("${height} * 10 >= 1000"));
 
     style = new Cesium3DTileStyle({
       show: true,
     });
+
     expect(style.show).toEqual(new Expression("true"));
 
     style = new Cesium3DTileStyle({
       show: false,
     });
+
     expect(style.show).toEqual(new Expression("false"));
   });
 
@@ -301,7 +275,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       showFactor: 10,
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.show = "${height} * ${showFactor} >= 1000";
     expect(style.show).toEqual(
       new Expression("${height} * ${showFactor} >= 1000", defines)
@@ -358,17 +331,20 @@ describe("Scene/Cesium3DTileStyle", function () {
     let style = new Cesium3DTileStyle({
       color: 'color("red")',
     });
+
     expect(style.color).toEqual(new Expression('color("red")'));
 
     style = new Cesium3DTileStyle({
       color: "rgba(30, 30, 30, 0.5)",
     });
+
     expect(style.color).toEqual(new Expression("rgba(30, 30, 30, 0.5)"));
 
     style = new Cesium3DTileStyle({
       color:
         '(${height} * 10 >= 1000) ? rgba(0.0, 0.0, 1.0, 0.5) : color("blue")',
     });
+
     expect(style.color).toEqual(
       new Expression(
         '(${height} * 10 >= 1000) ? rgba(0.0, 0.0, 1.0, 0.5) : color("blue")'
@@ -387,6 +363,7 @@ describe("Scene/Cesium3DTileStyle", function () {
     const style = new Cesium3DTileStyle({
       color: jsonExp,
     });
+
     expect(style.color).toEqual(new ConditionsExpression(jsonExp));
   });
 
@@ -413,7 +390,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.color expression in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const stringExp = 'color("red")';
     style.color = new Expression(stringExp);
     expect(style.style.color).toEqual(stringExp);
@@ -437,7 +413,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.color = 'color("${targetColor}")';
     expect(style.color).toEqual(
       new Expression('color("${targetColor}")', defines)
@@ -456,7 +431,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.color values in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.color = 'color("${targetColor}")';
     expect(style.style.color).toEqual('color("${targetColor}")');
 
@@ -512,7 +486,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets pointSize expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.pointSize = 2;
     expect(style.pointSize).toEqual(new Expression("2"));
 
@@ -536,7 +509,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.pointSize expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.pointSize = new Expression("2");
     expect(style.style.pointSize).toEqual("2");
 
@@ -566,7 +538,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetPointSize: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.pointSize = 2;
     expect(style.pointSize).toEqual(new Expression("2"));
 
@@ -591,7 +562,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetPointSize: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.pointSize = 2;
     expect(style.style.pointSize).toEqual("2");
 
@@ -657,7 +627,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets pointOutlineColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression('color("red")');
     style.pointOutlineColor = exp;
     expect(style.pointOutlineColor).toEqual(exp);
@@ -678,7 +647,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.pointOutlineColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.pointOutlineColor = new Expression('color("red")');
     expect(style.style.pointOutlineColor).toEqual('color("red")');
 
@@ -712,7 +680,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.pointOutlineColor = 'color("${targetColor}")';
     expect(style.pointOutlineColor).toEqual(
       new Expression('color("${targetColor}")', defines)
@@ -736,7 +703,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.pointOutlineColor = 'color("${targetColor}")';
     expect(style.style.pointOutlineColor).toEqual('color("${targetColor}")');
 
@@ -792,7 +758,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets pointOutlineWidth expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.pointOutlineWidth = 2;
     expect(style.pointOutlineWidth).toEqual(new Expression("2"));
 
@@ -816,7 +781,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.pointOutlineWidth expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.pointOutlineWidth = new Expression("2");
     expect(style.style.pointOutlineWidth).toEqual("2");
 
@@ -846,7 +810,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetPointSize: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.pointOutlineWidth = 2;
     expect(style.pointOutlineWidth).toEqual(new Expression("2"));
 
@@ -873,7 +836,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetPointSize: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.pointOutlineWidth = 2;
     expect(style.style.pointOutlineWidth).toEqual("2");
 
@@ -937,7 +899,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression('color("red")');
     style.labelColor = exp;
     expect(style.labelColor).toEqual(exp);
@@ -958,7 +919,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelColor = new Expression('color("red")');
     expect(style.style.labelColor).toEqual('color("red")');
     const jsonExp = {
@@ -991,7 +951,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelColor = 'color("${targetColor}")';
     expect(style.labelColor).toEqual(
       new Expression('color("${targetColor}")', defines)
@@ -1015,7 +974,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelColor = 'color("${targetColor}")';
     expect(style.style.labelColor).toEqual('color("${targetColor}")');
 
@@ -1078,7 +1036,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelOutlineColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression('color("red")');
     style.labelOutlineColor = exp;
     expect(style.labelOutlineColor).toEqual(exp);
@@ -1099,7 +1056,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelOutlineColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelOutlineColor = new Expression('color("red")');
     expect(style.style.labelOutlineColor).toEqual('color("red")');
 
@@ -1133,7 +1089,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelOutlineColor = 'color("${targetColor}")';
     expect(style.labelOutlineColor).toEqual(
       new Expression('color("${targetColor}")', defines)
@@ -1157,7 +1112,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelOutlineColor = 'color("${targetColor}")';
     expect(style.style.labelOutlineColor).toEqual('color("${targetColor}")');
 
@@ -1213,7 +1167,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelOutlineWidth expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelOutlineWidth = 2;
     expect(style.labelOutlineWidth).toEqual(new Expression("2"));
 
@@ -1237,7 +1190,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelOutlineWidth expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelOutlineWidth = new Expression("2");
     expect(style.style.labelOutlineWidth).toEqual("2");
     const jsonExp = {
@@ -1266,7 +1218,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetLabelSize: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelOutlineWidth = 2;
     expect(style.labelOutlineWidth).toEqual(new Expression("2"));
 
@@ -1293,7 +1244,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetLabelSize: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelOutlineWidth = 2;
     expect(style.style.labelOutlineWidth).toEqual("2");
 
@@ -1352,7 +1302,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets font expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.font = "'24px Helvetica'";
     expect(style.font).toEqual(new Expression("'24px Helvetica'"));
 
@@ -1376,7 +1325,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.font expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.font = new Expression("'24px Helvetica'");
     expect(style.style.font).toEqual("'24px Helvetica'");
 
@@ -1407,7 +1355,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetFont: "'30px Helvetica'",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.font = "'24px Helvetica'";
     expect(style.font).toEqual(new Expression("'24px Helvetica'"));
 
@@ -1430,7 +1377,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetFont: "'30px Helvetica'",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.font = "'24px Helvetica'";
     expect(style.style.font).toEqual("'24px Helvetica'");
 
@@ -1479,7 +1425,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelStyle expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelStyle = 2;
     expect(style.labelStyle).toEqual(new Expression("2"));
 
@@ -1503,7 +1448,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelStyle expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelStyle = new Expression("2");
     expect(style.style.labelStyle).toEqual("2");
 
@@ -1533,7 +1477,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetLabelStyle: "2",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelStyle = 2;
     expect(style.labelStyle).toEqual(new Expression("2"));
 
@@ -1560,7 +1503,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetLabelStyle: "2",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelStyle = 2;
     expect(style.style.labelStyle).toEqual("2");
 
@@ -1619,7 +1561,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelText expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelText = "'test text'";
     expect(style.labelText).toEqual(new Expression("'test text'"));
 
@@ -1643,7 +1584,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelText expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelText = new Expression("'test text'");
     expect(style.style.labelText).toEqual("'test text'");
 
@@ -1674,7 +1614,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetText: "'test text 1'",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelText = "'test text'";
     expect(style.labelText).toEqual(new Expression("'test text'"));
 
@@ -1697,7 +1636,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetText: "'test text 1'",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelText = "'test text'";
     expect(style.style.labelText).toEqual("'test text'");
 
@@ -1763,7 +1701,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets backgroundColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression('color("red")');
     style.backgroundColor = exp;
     expect(style.backgroundColor).toEqual(exp);
@@ -1784,7 +1721,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.backgroundColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.backgroundColor = new Expression('color("red")');
     expect(style.style.backgroundColor).toEqual('color("red")');
 
@@ -1818,7 +1754,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.backgroundColor = 'color("${targetColor}")';
     expect(style.backgroundColor).toEqual(
       new Expression('color("${targetColor}")', defines)
@@ -1842,7 +1777,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.backgroundColor = 'color("${targetColor}")';
     expect(style.style.backgroundColor).toEqual('color("${targetColor}")');
 
@@ -1903,7 +1837,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets backgroundPadding expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression("vec2(1.0, 2.0)");
     style.backgroundPadding = exp;
     expect(style.backgroundPadding).toEqual(exp);
@@ -1924,7 +1857,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.backgroundPadding expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.backgroundPadding = new Expression("vec2(1.0, 2.0)");
     expect(style.style.backgroundPadding).toEqual("vec2(1.0, 2.0)");
 
@@ -1955,7 +1887,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetPadding: "3.0, 4.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.backgroundPadding = 'vec2("${targetPadding}")';
     expect(style.backgroundPadding).toEqual(
       new Expression('vec2("${targetPadding}")', defines)
@@ -1979,7 +1910,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetPadding: "3.0, 4.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.backgroundPadding = 'vec2("${targetPadding}")';
     expect(style.style.backgroundPadding).toEqual('vec2("${targetPadding}")');
 
@@ -2047,7 +1977,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets backgroundEnabled expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const condExp = new ConditionsExpression({
       conditions: [
         ["${height} > 2", "false"],
@@ -2065,7 +1994,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.backgroundEnabled expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.backgroundEnabled = new Expression("false");
     expect(style.style.backgroundEnabled).toEqual("false");
 
@@ -2093,7 +2021,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       backgroundFactor: 10,
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.backgroundEnabled = "${height} * ${backgroundFactor} >= 1000";
     expect(style.backgroundEnabled).toEqual(
       new Expression("${height} * ${backgroundFactor} >= 1000", defines)
@@ -2123,7 +2050,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       backgroundFactor: 10,
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.backgroundEnabled = "${height} * ${backgroundFactor} >= 1000";
     expect(style.style.backgroundEnabled).toEqual(
       "${height} * ${backgroundFactor} >= 1000"
@@ -2158,6 +2084,7 @@ describe("Scene/Cesium3DTileStyle", function () {
     let style = new Cesium3DTileStyle({
       scaleByDistance: "vec4(1.0, 2.0, 3.0, 4.0)",
     });
+
     expect(style.scaleByDistance).toEqual(
       new Expression("vec4(1.0, 2.0, 3.0, 4.0)")
     );
@@ -2165,6 +2092,7 @@ describe("Scene/Cesium3DTileStyle", function () {
     style = new Cesium3DTileStyle({
       scaleByDistance: "vec4(5.0, 6.0, 7.0, 8.0)",
     });
+
     expect(style.scaleByDistance).toEqual(
       new Expression("vec4(5.0, 6.0, 7.0, 8.0)")
     );
@@ -2217,7 +2145,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.scaleByDistance expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.scaleByDistance = new Expression("vec4(5.0, 6.0, 7.0, 8.0)");
     expect(style.style.scaleByDistance).toEqual("vec4(5.0, 6.0, 7.0, 8.0)");
 
@@ -2248,7 +2175,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetScale: "1.0, 2.0, 3.0, 4.",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.scaleByDistance = 'vec4("${targetScale}")';
     expect(style.scaleByDistance).toEqual(
       new Expression('vec4("${targetScale}")', defines)
@@ -2272,7 +2198,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetScale: "1.0, 2.0, 3.0, 4.",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.scaleByDistance = 'vec4("${targetScale}")';
     expect(style.style.scaleByDistance).toEqual('vec4("${targetScale}")');
 
@@ -2339,7 +2264,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets distanceDisplayCondition expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression("vec4(5.0, 6.0, 7.0, 8.0)");
     style.distanceDisplayCondition = exp;
     expect(style.distanceDisplayCondition).toEqual(exp);
@@ -2360,7 +2284,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.distanceDisplayCondition expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.distanceDisplayCondition = new Expression("vec4(5.0, 6.0, 7.0, 8.0)");
     expect(style.style.distanceDisplayCondition).toEqual(
       "vec4(5.0, 6.0, 7.0, 8.0)"
@@ -2393,7 +2316,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetTranslucency: "1.0, 2.0, 3.0, 4.",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.distanceDisplayCondition = 'vec4("${targetTranslucency}")';
     expect(style.distanceDisplayCondition).toEqual(
       new Expression('vec4("${targetTranslucency}")', defines)
@@ -2417,7 +2339,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetTranslucency: "1.0, 2.0, 3.0, 4.",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.distanceDisplayCondition = 'vec4("${targetTranslucency}")';
     expect(style.style.distanceDisplayCondition).toEqual(
       'vec4("${targetTranslucency}")'
@@ -2475,7 +2396,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets heightOffset expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.heightOffset = 2;
     expect(style.heightOffset).toEqual(new Expression("2"));
 
@@ -2499,7 +2419,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.heightOffset expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.heightOffset = new Expression("2");
     expect(style.style.heightOffset).toEqual("2");
 
@@ -2530,7 +2449,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetHeight: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.heightOffset = 2;
     expect(style.heightOffset).toEqual(new Expression("2"));
 
@@ -2557,7 +2475,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetHeight: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.heightOffset = "${targetHeight} + 1.0";
     expect(style.style.heightOffset).toEqual("${targetHeight} + 1.0");
 
@@ -2625,7 +2542,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets anchorLineEnabled expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const condExp = new ConditionsExpression({
       conditions: [
         ["${height} > 2", "false"],
@@ -2643,7 +2559,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.anchorLineEnabled expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.anchorLineEnabled = new Expression("false");
     expect(style.style.anchorLineEnabled).toEqual("false");
 
@@ -2671,7 +2586,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       anchorFactor: 10,
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.anchorLineEnabled = "${height} * ${anchorFactor} >= 1000";
     expect(style.anchorLineEnabled).toEqual(
       new Expression("${height} * ${anchorFactor} >= 1000", defines)
@@ -2701,7 +2615,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       anchorFactor: 10,
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.anchorLineEnabled = "${height} * ${anchorFactor} >= 1000";
     expect(style.style.anchorLineEnabled).toEqual(
       "${height} * ${anchorFactor} >= 1000"
@@ -2772,7 +2685,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets anchorLineColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     const exp = new Expression('color("red")');
     style.anchorLineColor = exp;
     expect(style.anchorLineColor).toEqual(exp);
@@ -2793,7 +2705,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.anchorLineColor expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.anchorLineColor = new Expression('color("red")');
     expect(style.style.anchorLineColor).toEqual('color("red")');
 
@@ -2827,7 +2738,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.anchorLineColor = 'color("${targetColor}")';
     expect(style.anchorLineColor).toEqual(
       new Expression('color("${targetColor}")', defines)
@@ -2851,7 +2761,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetColor: "red",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.anchorLineColor = 'color("${targetColor}")';
     expect(style.style.anchorLineColor).toEqual('color("${targetColor}")');
 
@@ -2907,7 +2816,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets image expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.image = "'url/to/image'";
     expect(style.image).toEqual(new Expression("'url/to/image'"));
 
@@ -2931,7 +2839,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.image expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.image = new Expression("'url/to/image'");
     expect(style.style.image).toEqual("'url/to/image'");
 
@@ -2962,7 +2869,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetUrl: "'url/to/image1'",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.image = "'url/to/image'";
     expect(style.image).toEqual(new Expression("'url/to/image'"));
 
@@ -2985,7 +2891,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetUrl: "'url/to/image1'",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.image = "'url/to/image'";
     expect(style.style.image).toEqual("'url/to/image'");
 
@@ -3048,7 +2953,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets disableDepthTestDistance expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.disableDepthTestDistance = 2;
     expect(style.disableDepthTestDistance).toEqual(new Expression("2"));
 
@@ -3072,7 +2976,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.disableDepthTestDistance expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.disableDepthTestDistance = new Expression("2");
     expect(style.style.disableDepthTestDistance).toEqual("2");
 
@@ -3103,7 +3006,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetDistance: "2.0",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.disableDepthTestDistance = 2;
     expect(style.disableDepthTestDistance).toEqual(new Expression("2"));
 
@@ -3156,7 +3058,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets horizontalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.horizontalOrigin = 1;
     expect(style.horizontalOrigin).toEqual(new Expression("1"));
 
@@ -3180,7 +3081,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.horizontalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.horizontalOrigin = new Expression("1");
     expect(style.style.horizontalOrigin).toEqual("1");
 
@@ -3211,7 +3111,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.horizontalOrigin = -1;
     expect(style.horizontalOrigin).toEqual(new Expression("-1"));
 
@@ -3238,7 +3137,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.horizontalOrigin = -1;
     expect(style.style.horizontalOrigin).toEqual("-1");
 
@@ -3259,7 +3157,6 @@ describe("Scene/Cesium3DTileStyle", function () {
   it("sets verticalOrigin value to undefined if value not present", function () {
     let style = new Cesium3DTileStyle({});
     expect(style.verticalOrigin).toBeUndefined();
-
     style = new Cesium3DTileStyle();
     expect(style.verticalOrigin).toBeUndefined();
   });
@@ -3287,7 +3184,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets verticalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.verticalOrigin = 1;
     expect(style.verticalOrigin).toEqual(new Expression("1"));
 
@@ -3309,9 +3205,8 @@ describe("Scene/Cesium3DTileStyle", function () {
     expect(style.verticalOrigin).toBeUndefined();
   });
 
-  it("sets style.styleverticalOrigin expressions in setter", function () {
+  it("sets style.verticalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.verticalOrigin = new Expression("1");
     expect(style.style.verticalOrigin).toEqual("1");
 
@@ -3342,7 +3237,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.verticalOrigin = -1;
     expect(style.verticalOrigin).toEqual(new Expression("-1"));
 
@@ -3369,7 +3263,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.verticalOrigin = -1;
     expect(style.style.verticalOrigin).toEqual("-1");
 
@@ -3390,7 +3283,6 @@ describe("Scene/Cesium3DTileStyle", function () {
   it("sets labelHorizontalOrigin value to undefined if value not present", function () {
     let style = new Cesium3DTileStyle({});
     expect(style.labelHorizontalOrigin).toBeUndefined();
-
     style = new Cesium3DTileStyle();
     expect(style.labelHorizontalOrigin).toBeUndefined();
   });
@@ -3420,7 +3312,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelHorizontalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelHorizontalOrigin = 1;
     expect(style.labelHorizontalOrigin).toEqual(new Expression("1"));
 
@@ -3444,7 +3335,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelHorizontalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelHorizontalOrigin = new Expression("1");
     expect(style.style.labelHorizontalOrigin).toEqual("1");
 
@@ -3475,7 +3365,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelHorizontalOrigin = -1;
     expect(style.labelHorizontalOrigin).toEqual(new Expression("-1"));
 
@@ -3502,7 +3391,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelHorizontalOrigin = -1;
     expect(style.style.labelHorizontalOrigin).toEqual("-1");
 
@@ -3523,7 +3411,6 @@ describe("Scene/Cesium3DTileStyle", function () {
   it("sets labelVerticalOrigin value to undefined if value not present", function () {
     let style = new Cesium3DTileStyle({});
     expect(style.labelVerticalOrigin).toBeUndefined();
-
     style = new Cesium3DTileStyle();
     expect(style.labelVerticalOrigin).toBeUndefined();
   });
@@ -3553,7 +3440,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets labelVerticalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelVerticalOrigin = 1;
     expect(style.labelVerticalOrigin).toEqual(new Expression("1"));
 
@@ -3577,7 +3463,6 @@ describe("Scene/Cesium3DTileStyle", function () {
 
   it("sets style.labelVerticalOrigin expressions in setter", function () {
     const style = new Cesium3DTileStyle();
-
     style.labelVerticalOrigin = new Expression("1");
     expect(style.style.labelVerticalOrigin).toEqual("1");
 
@@ -3635,7 +3520,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       targetOrigin: "-1",
     };
     const style = new Cesium3DTileStyle({ defines: defines });
-
     style.labelVerticalOrigin = -1;
     expect(style.style.labelVerticalOrigin).toEqual("-1");
 
@@ -3926,16 +3810,6 @@ describe("Scene/Cesium3DTileStyle", function () {
     expect(style.meta).toEqual({});
   });
 
-  it("default meta has no properties", function () {
-    let style = new Cesium3DTileStyle({});
-    expect(style.meta).toEqual({});
-
-    style = new Cesium3DTileStyle({
-      meta: {},
-    });
-    expect(style.meta).toEqual({});
-  });
-
   it("throws on accessing meta if not ready", function () {
     const style = new Cesium3DTileStyle({});
     style._ready = false;
@@ -4052,7 +3926,6 @@ describe("Scene/Cesium3DTileStyle", function () {
     const style = new Cesium3DTileStyle({
       pointSize: "${Temperature} / 10.0",
     });
-
     expect(style.pointSize.evaluate(feature1)).toEqual(7.8);
     expect(style.pointSize.evaluate(feature2)).toEqual(9.2);
   });
@@ -4079,6 +3952,7 @@ describe("Scene/Cesium3DTileStyle", function () {
         ],
       },
     });
+
     expect(style.pointSize.evaluate(feature1)).toEqual(6);
     expect(style.pointSize.evaluate(feature2)).toEqual(3);
   });
@@ -4144,7 +4018,6 @@ describe("Scene/Cesium3DTileStyle", function () {
       color: "${Height} * color('red')",
       show: "${Floors} > 10",
     });
-
     const variables = style.getVariables();
     expect(variables.sort()).toEqual(["Floors", "Height", "PointSize"]);
   });
