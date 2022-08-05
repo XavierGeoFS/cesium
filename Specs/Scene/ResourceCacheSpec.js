@@ -247,20 +247,14 @@ describe(
       ],
     };
 
-    // Index buffers will load as typed arrays only in WebGL1.
-    // In order to load them as buffers, the scene must have WebGL2 enabled.
     let scene;
-    let sceneWithWebgl2;
 
     beforeAll(function () {
       scene = createScene();
-      sceneWithWebgl2 = createScene();
-      sceneWithWebgl2.context._webgl2 = true;
     });
 
     afterAll(function () {
       scene.destroyForSpecs();
-      sceneWithWebgl2.destroyForSpecs();
     });
 
     afterEach(function () {
@@ -857,6 +851,7 @@ describe(
         gltfResource: gltfResource,
         baseResource: gltfResource,
         bufferViewId: 0,
+        loadBuffer: true,
       });
       const vertexBufferLoader = ResourceCache.loadVertexBuffer({
         gltf: gltfUncompressed,
@@ -864,6 +859,7 @@ describe(
         baseResource: gltfResource,
         bufferViewId: 0,
         accessorId: 0,
+        loadBuffer: true,
       });
 
       const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
@@ -877,6 +873,7 @@ describe(
           gltfResource: gltfResource,
           baseResource: gltfResource,
           bufferViewId: 0,
+          loadBuffer: true,
         })
       ).toBe(vertexBufferLoader);
 
@@ -886,6 +883,13 @@ describe(
         vertexBufferLoader
       ) {
         expect(vertexBufferLoader.buffer).toBeDefined();
+
+        return cacheEntry._statisticsPromise.then(function () {
+          // The vertex buffer should only be counted once
+          expect(ResourceCache.statistics.geometryByteLength).toBe(
+            vertexBufferLoader.buffer.sizeInBytes
+          );
+        });
       });
     });
 
@@ -904,6 +908,7 @@ describe(
         baseResource: gltfResource,
         draco: dracoExtension,
         attributeSemantic: "POSITION",
+        loadBuffer: true,
       });
       const vertexBufferLoader = ResourceCache.loadVertexBuffer({
         gltf: gltfDraco,
@@ -912,6 +917,7 @@ describe(
         draco: dracoExtension,
         attributeSemantic: "POSITION",
         accessorId: 0,
+        loadBuffer: true,
       });
 
       const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
@@ -927,6 +933,7 @@ describe(
           draco: dracoExtension,
           attributeSemantic: "POSITION",
           accessorId: 0,
+          loadBuffer: true,
         })
       ).toBe(vertexBufferLoader);
 
@@ -936,6 +943,13 @@ describe(
         vertexBufferLoader
       ) {
         expect(vertexBufferLoader.buffer).toBeDefined();
+
+        return cacheEntry._statisticsPromise.then(function () {
+          // The vertex buffer should only be counted once
+          expect(ResourceCache.statistics.geometryByteLength).toBe(
+            vertexBufferLoader.buffer.sizeInBytes
+          );
+        });
       });
     });
 
@@ -949,7 +963,7 @@ describe(
         gltfResource: gltfResource,
         baseResource: gltfResource,
         bufferViewId: 0,
-        loadAsTypedArray: true,
+        loadTypedArray: true,
       });
       const vertexBufferLoader = ResourceCache.loadVertexBuffer({
         gltf: gltfUncompressed,
@@ -957,7 +971,7 @@ describe(
         baseResource: gltfResource,
         bufferViewId: 0,
         accessorId: 0,
-        loadAsTypedArray: true,
+        loadTypedArray: true,
       });
 
       expect(vertexBufferLoader.cacheKey).toBe(expectedCacheKey);
@@ -967,6 +981,54 @@ describe(
       ) {
         expect(vertexBufferLoader.typedArray).toBeDefined();
         expect(vertexBufferLoader.buffer).toBeUndefined();
+
+        const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
+        return cacheEntry._statisticsPromise.then(function () {
+          expect(ResourceCache.statistics.geometryByteLength).toBe(
+            vertexBufferLoader.typedArray.byteLength
+          );
+        });
+      });
+    });
+
+    it("loads vertex buffer as buffer and typed array for 2D", function () {
+      spyOn(Resource.prototype, "fetchArrayBuffer").and.returnValue(
+        Promise.resolve(bufferArrayBuffer)
+      );
+
+      const expectedCacheKey = ResourceCacheKey.getVertexBufferCacheKey({
+        gltf: gltfUncompressed,
+        gltfResource: gltfResource,
+        baseResource: gltfResource,
+        bufferViewId: 0,
+        loadBuffer: true,
+        loadTypedArray: true,
+      });
+      const vertexBufferLoader = ResourceCache.loadVertexBuffer({
+        gltf: gltfUncompressed,
+        gltfResource: gltfResource,
+        baseResource: gltfResource,
+        bufferViewId: 0,
+        accessorId: 0,
+        loadBuffer: true,
+        loadTypedArray: true,
+      });
+
+      expect(vertexBufferLoader.cacheKey).toBe(expectedCacheKey);
+
+      return waitForLoaderProcess(vertexBufferLoader, scene).then(function (
+        vertexBufferLoader
+      ) {
+        expect(vertexBufferLoader.typedArray).toBeDefined();
+        expect(vertexBufferLoader.buffer).toBeDefined();
+
+        const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
+        return cacheEntry._statisticsPromise.then(function () {
+          const totalSize =
+            vertexBufferLoader.typedArray.byteLength +
+            vertexBufferLoader.buffer.sizeInBytes;
+          expect(ResourceCache.statistics.geometryByteLength).toBe(totalSize);
+        });
       });
     });
 
@@ -977,6 +1039,7 @@ describe(
           gltfResource: gltfResource,
           baseResource: gltfResource,
           bufferViewId: 0,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -988,6 +1051,7 @@ describe(
           gltfResource: undefined,
           baseResource: gltfResource,
           bufferViewId: 0,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -999,6 +1063,7 @@ describe(
           gltfResource: gltfResource,
           baseResource: undefined,
           bufferViewId: 0,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1013,6 +1078,7 @@ describe(
           draco: dracoExtension,
           attributeSemantic: "POSITION",
           accessorId: 0,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1023,6 +1089,7 @@ describe(
           gltf: gltfDraco,
           gltfResource: gltfResource,
           baseResource: gltfResource,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1036,6 +1103,7 @@ describe(
           draco: dracoExtension,
           attributeSemantic: undefined,
           accessorId: 0,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1049,6 +1117,20 @@ describe(
           draco: dracoExtension,
           attributeSemantic: "POSITION",
           accessorId: undefined,
+          loadBuffer: true,
+        });
+      }).toThrowDeveloperError();
+    });
+
+    it("loadVertexBuffer throws if both loadBuffer and loadTypedArray are false", function () {
+      expect(function () {
+        ResourceCache.loadVertexBuffer({
+          gltf: gltfUncompressed,
+          gltfResource: gltfResource,
+          baseResource: gltfResource,
+          bufferViewId: 0,
+          loadBuffer: false,
+          loadTypedArray: false,
         });
       }).toThrowDeveloperError();
     });
@@ -1063,12 +1145,14 @@ describe(
         accessorId: 2,
         gltfResource: gltfResource,
         baseResource: gltfResource,
+        loadBuffer: true,
       });
       const indexBufferLoader = ResourceCache.loadIndexBuffer({
         gltf: gltfUncompressed,
         accessorId: 2,
         gltfResource: gltfResource,
         baseResource: gltfResource,
+        loadBuffer: true,
       });
 
       const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
@@ -1082,6 +1166,7 @@ describe(
           accessorId: 2,
           gltfResource: gltfResource,
           baseResource: gltfResource,
+          loadBuffer: true,
         })
       ).toBe(indexBufferLoader);
 
@@ -1091,6 +1176,11 @@ describe(
         indexBufferLoader
       ) {
         expect(indexBufferLoader.buffer).toBeDefined();
+        expect(indexBufferLoader.typedArray).toBeUndefined();
+
+        expect(ResourceCache.statistics.geometryByteLength).toBe(
+          indexBufferLoader.buffer.sizeInBytes
+        );
       });
     });
 
@@ -1109,6 +1199,7 @@ describe(
         gltfResource: gltfResource,
         baseResource: gltfResource,
         draco: dracoExtension,
+        loadBuffer: true,
       });
       const indexBufferLoader = ResourceCache.loadIndexBuffer({
         gltf: gltfDraco,
@@ -1116,6 +1207,7 @@ describe(
         gltfResource: gltfResource,
         baseResource: gltfResource,
         draco: dracoExtension,
+        loadBuffer: true,
       });
 
       const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
@@ -1130,19 +1222,27 @@ describe(
           gltfResource: gltfResource,
           baseResource: gltfResource,
           draco: dracoExtension,
+          loadBuffer: true,
         })
       ).toBe(indexBufferLoader);
 
       expect(cacheEntry.referenceCount).toBe(2);
 
-      return waitForLoaderProcess(indexBufferLoader, sceneWithWebgl2).then(
-        function (indexBufferLoader) {
-          expect(indexBufferLoader.buffer).toBeDefined();
-        }
-      );
+      return waitForLoaderProcess(indexBufferLoader, scene).then(function (
+        indexBufferLoader
+      ) {
+        expect(indexBufferLoader.buffer).toBeDefined();
+
+        return cacheEntry._statisticsPromise.then(function () {
+          // The index buffer should only be counted once
+          expect(ResourceCache.statistics.geometryByteLength).toBe(
+            indexBufferLoader.buffer.sizeInBytes
+          );
+        });
+      });
     });
 
-    it("loads index buffer as typed array using option", function () {
+    it("loads index buffer as typed array", function () {
       spyOn(Resource.prototype, "fetchArrayBuffer").and.returnValue(
         Promise.resolve(bufferArrayBuffer)
       );
@@ -1152,14 +1252,14 @@ describe(
         accessorId: 2,
         gltfResource: gltfResource,
         baseResource: gltfResource,
-        loadAsTypedArray: true,
+        loadTypedArray: true,
       });
       const indexBufferLoader = ResourceCache.loadIndexBuffer({
         gltf: gltfUncompressed,
         accessorId: 2,
         gltfResource: gltfResource,
         baseResource: gltfResource,
-        loadAsTypedArray: true,
+        loadTypedArray: true,
       });
 
       expect(indexBufferLoader.cacheKey).toBe(expectedCacheKey);
@@ -1169,10 +1269,17 @@ describe(
       ) {
         expect(indexBufferLoader.typedArray).toBeDefined();
         expect(indexBufferLoader.buffer).toBeUndefined();
+
+        const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
+        return cacheEntry._statisticsPromise.then(function () {
+          expect(ResourceCache.statistics.geometryByteLength).toBe(
+            indexBufferLoader.typedArray.byteLength
+          );
+        });
       });
     });
 
-    it("loads index buffer as typed array for wireframes in WebGL1", function () {
+    it("loads index buffer as buffer and typed array", function () {
       spyOn(Resource.prototype, "fetchArrayBuffer").and.returnValue(
         Promise.resolve(bufferArrayBuffer)
       );
@@ -1182,15 +1289,16 @@ describe(
         accessorId: 2,
         gltfResource: gltfResource,
         baseResource: gltfResource,
-        loadAsTypedArray: false,
+        loadBuffer: true,
+        loadTypedArray: true,
       });
       const indexBufferLoader = ResourceCache.loadIndexBuffer({
         gltf: gltfUncompressed,
         accessorId: 2,
         gltfResource: gltfResource,
         baseResource: gltfResource,
-        loadAsTypedArray: false,
-        loadForWireframe: true,
+        loadBuffer: true,
+        loadTypedArray: true,
       });
 
       expect(indexBufferLoader.cacheKey).toBe(expectedCacheKey);
@@ -1199,52 +1307,16 @@ describe(
         indexBufferLoader
       ) {
         expect(indexBufferLoader.typedArray).toBeDefined();
-        expect(indexBufferLoader.buffer).toBeUndefined();
+        expect(indexBufferLoader.buffer).toBeDefined();
+
+        const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
+        return cacheEntry._statisticsPromise.then(function () {
+          // The statistics will count both buffer and typed array
+          expect(ResourceCache.statistics.geometryByteLength).toBe(
+            2 * indexBufferLoader.typedArray.byteLength
+          );
+        });
       });
-    });
-
-    it("loads index buffer as buffer for wireframes in WebGL2", function () {
-      spyOn(Resource.prototype, "fetchArrayBuffer").and.returnValue(
-        Promise.resolve(bufferArrayBuffer)
-      );
-
-      const expectedCacheKey = ResourceCacheKey.getIndexBufferCacheKey({
-        gltf: gltfUncompressed,
-        accessorId: 2,
-        gltfResource: gltfResource,
-        baseResource: gltfResource,
-        loadForWireframe: true,
-      });
-      const indexBufferLoader = ResourceCache.loadIndexBuffer({
-        gltf: gltfUncompressed,
-        accessorId: 2,
-        gltfResource: gltfResource,
-        baseResource: gltfResource,
-        loadForWireframe: true,
-      });
-
-      const cacheEntry = ResourceCache.cacheEntries[expectedCacheKey];
-      expect(indexBufferLoader.cacheKey).toBe(expectedCacheKey);
-      expect(cacheEntry.referenceCount).toBe(1);
-
-      // The existing resource is returned if the computed cache key is the same
-      expect(
-        ResourceCache.loadIndexBuffer({
-          gltf: gltfUncompressed,
-          accessorId: 2,
-          gltfResource: gltfResource,
-          baseResource: gltfResource,
-        })
-      ).toBe(indexBufferLoader);
-
-      expect(cacheEntry.referenceCount).toBe(2);
-
-      return waitForLoaderProcess(indexBufferLoader, sceneWithWebgl2).then(
-        function (indexBufferLoader) {
-          expect(indexBufferLoader.typedArray).toBeUndefined();
-          expect(indexBufferLoader.buffer).toBeDefined();
-        }
-      );
     });
 
     it("loadIndexBuffer throws if gltf is undefined", function () {
@@ -1254,6 +1326,7 @@ describe(
           accessorId: 2,
           gltfResource: gltfResource,
           baseResource: gltfResource,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1265,6 +1338,7 @@ describe(
           accessorId: undefined,
           gltfResource: gltfResource,
           baseResource: gltfResource,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1276,6 +1350,7 @@ describe(
           accessorId: 2,
           gltfResource: undefined,
           baseResource: gltfResource,
+          loadBuffer: true,
         });
       }).toThrowDeveloperError();
     });
@@ -1287,6 +1362,20 @@ describe(
           accessorId: 2,
           gltfResource: gltfResource,
           baseResource: undefined,
+          loadBuffer: true,
+        });
+      }).toThrowDeveloperError();
+    });
+
+    it("loadIndexBuffer throws if both loadBuffer and loadTypedArray are false", function () {
+      expect(function () {
+        ResourceCache.loadIndexBuffer({
+          gltf: gltfUncompressed,
+          accessorId: 2,
+          gltfResource: gltfResource,
+          baseResource: gltfResource,
+          loadBuffer: false,
+          loadTypedArray: false,
         });
       }).toThrowDeveloperError();
     });
@@ -1413,6 +1502,13 @@ describe(
         textureLoader
       ) {
         expect(textureLoader.texture).toBeDefined();
+
+        return cacheEntry._statisticsPromise.then(function () {
+          // The texture should only be counted once
+          expect(ResourceCache.statistics.texturesByteLength).toBe(
+            textureLoader.texture.sizeInBytes
+          );
+        });
       });
     });
 

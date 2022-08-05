@@ -1,4 +1,3 @@
-import arraySlice from "../Core/arraySlice.js";
 import ComponentDatatype from "../Core/ComponentDatatype.js";
 import defined from "../Core/defined.js";
 import FeatureDetection from "../Core/FeatureDetection.js";
@@ -188,7 +187,7 @@ DracoLoader.parse = function (model, context) {
   }
 
   const dequantizeInShader = model._dequantizeInShader;
-  const gltf = model.gltf;
+  const gltf = model.gltfInternal;
   ForEach.mesh(gltf, function (mesh, meshId) {
     ForEach.meshPrimitive(mesh, function (primitive, primitiveId) {
       if (!defined(primitive.extensions)) {
@@ -201,8 +200,9 @@ DracoLoader.parse = function (model, context) {
       }
 
       const bufferView = gltf.bufferViews[compressionData.bufferView];
-      const typedArray = arraySlice(
-        gltf.buffers[bufferView.buffer].extras._pipeline.source,
+      const arraySource =
+        gltf.buffers[bufferView.buffer].extras._pipeline.source;
+      const typedArray = arraySource.slice(
         bufferView.byteOffset,
         bufferView.byteOffset + bufferView.byteLength
       );

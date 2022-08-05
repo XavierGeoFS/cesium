@@ -1,3 +1,5 @@
+# Contributors
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to CesiumJS. The following people have contributed to CesiumJS, under the following agreements:
 
 ## [Corporate CLA](Documentation/Contributors/CLAs/corporate-contributor-license-agreement-v1.0.pdf)
@@ -156,6 +158,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to Cesiu
   - [Janine Liu](https://github.com/j9liu)
   - [Sam Rothstein](https://github.com/srothst1)
   - [Daniel Krupka](https://github.com/krupkad)
+  - [Jeshurun Hembd](https://github.com/jjhembd)
+  - [Mia Tang](https://github.com/miatang13)
 - [Northrop Grumman](http://www.northropgrumman.com)
   - [Joseph Stein](https://github.com/nahgrin)
 - [EOX IT Services GmbH](https://eox.at)
@@ -172,6 +176,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to Cesiu
   - [Sebastian Fernandez](https://github.com/SebastianPFernandez)
 - Beijing Xibushijie
   - [Tang Xiaofei](https://github.com/vtxf)
+- [Maxar](https://www.maxar.com)
+  - [Erik Dahlström](https://github.com/erikdahlstrom)
+- [Novatron Oy](https://novatron.fi/en/)
+  - [Jussi Hirvonen](https://github.com/VsKatshuma)
 
 ## [Individual CLA](Documentation/Contributors/CLAs/individual-contributor-license-agreement-v1.0.pdf)
 
@@ -314,8 +322,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to Cesiu
 - [Jon Beniston](https://github.com/srcejon)
 - [Ugnius Malukas](https://github.com/ugnelis)
 - [Justin Peter](https://github.com/themagicnacho)
+- [Jefferson Chua](https://github.com/jeffechua)
 - [Gu Miao](https://github.com/Gu-Miao)
 - [Shen WeiQun](https://github.com/ShenWeiQun)
 - [四季留歌](https://github.com/onsummer)
 - [Yuri Chen](https://github.com/yurichen17)
 - [David Ferguson](https://github.com/jdfwarrior)
+- [Karthik Vaithin](https://github.com/kvaithin)
+- [Jonathan Meerson](https://github.com/yonzmeer)
+- [Jiang Heng](https://github.com/jiangheng90)

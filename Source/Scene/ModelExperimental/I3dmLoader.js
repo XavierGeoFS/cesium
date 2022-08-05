@@ -5,7 +5,6 @@ import Cesium3DTileFeatureTable from "../Cesium3DTileFeatureTable.js";
 import Check from "../../Core/Check.js";
 import ComponentDatatype from "../../Core/ComponentDatatype.js";
 import defaultValue from "../../Core/defaultValue.js";
-import defer from "../../Core/defer.js";
 import defined from "../../Core/defined.js";
 import Ellipsoid from "../../Core/Ellipsoid.js";
 import StructuralMetadata from "../StructuralMetadata.js";
@@ -59,8 +58,9 @@ const Instances = ModelComponents.Instances;
  * @param {Boolean} [options.incrementallyLoadTextures=true] Determine if textures may continue to stream in after the glTF is loaded.
  * @param {Axis} [options.upAxis=Axis.Y] The up-axis of the glTF model.
  * @param {Axis} [options.forwardAxis=Axis.X] The forward-axis of the glTF model.
- * @param {Boolean} [options.loadAsTypedArray=false] Load all attributes as typed arrays instead of GPU buffers.
+ * @param {Boolean} [options.loadAttributesAsTypedArray=false] Load all attributes as typed arrays instead of GPU buffers. If the attributes are interleaved in the glTF they will be de-interleaved in the typed array.
  * @param {Boolean} [options.loadIndicesForWireframe=false] Load the index buffer as a typed array so wireframe indices can be created for WebGL1.
+ * @param {Boolean} [options.loadPrimitiveOutline=true] If true, load outlines from the {@link https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/CESIUM_primitive_outline|CESIUM_primitive_outline} extension. This can be set false to avoid post-processing geometry at load time.
  */
 function I3dmLoader(options) {
   options = defaultValue(options, defaultValue.EMPTY_OBJECT);
@@ -77,11 +77,15 @@ function I3dmLoader(options) {
   );
   const upAxis = defaultValue(options.upAxis, Axis.Y);
   const forwardAxis = defaultValue(options.forwardAxis, Axis.X);
-  const loadAsTypedArray = defaultValue(options.loadAsTypedArray, false);
+  const loadAttributesAsTypedArray = defaultValue(
+    options.loadAttributesAsTypedArray,
+    false
+  );
   const loadIndicesForWireframe = defaultValue(
     options.loadIndicesForWireframe,
     false
   );
+  const loadPrimitiveOutline = defaultValue(options.loadPrimitiveOutline, true);
 
   //>>includeStart('debug', pragmas.debug);
   Check.typeOf.object("options.i3dmResource", i3dmResource);
@@ -99,11 +103,12 @@ function I3dmLoader(options) {
   this._incrementallyLoadTextures = incrementallyLoadTextures;
   this._upAxis = upAxis;
   this._forwardAxis = forwardAxis;
-  this._loadAsTypedArray = loadAsTypedArray;
+  this._loadAttributesAsTypedArray = loadAttributesAsTypedArray;
   this._loadIndicesForWireframe = loadIndicesForWireframe;
+  this._loadPrimitiveOutline = loadPrimitiveOutline;
 
   this._state = I3dmLoaderState.UNLOADED;
-  this._promise = defer();
+  this._promise = undefined;
 
   this._gltfLoader = undefined;
 
@@ -120,17 +125,17 @@ if (defined(Object.create)) {
 
 Object.defineProperties(I3dmLoader.prototype, {
   /**
-   * A promise that resolves to the resource when the resource is ready.
+   * A promise that resolves to the resource when the resource is ready, or undefined if the resource hasn't started loading.
    *
    * @memberof I3dmLoader.prototype
    *
-   * @type {Promise.<I3dmLoader>}
+   * @type {Promise.<I3dmLoader>|undefined}
    * @readonly
    * @private
    */
   promise: {
     get: function () {
-      return this._promise.promise;
+      return this._promise;
     },
   },
 
@@ -184,6 +189,7 @@ Object.defineProperties(I3dmLoader.prototype, {
 
 /**
  * Loads the resource.
+ * @returns {Promise.<I3dmLoader>} A promise which resolves to the loader when the resource loading is completed.
  * @private
  */
 I3dmLoader.prototype.load = function () {
@@ -234,8 +240,9 @@ I3dmLoader.prototype.load = function () {
     forwardAxis: this._forwardAxis,
     releaseGltfJson: this._releaseGltfJson,
     incrementallyLoadTextures: this._incrementallyLoadTextures,
-    loadAsTypedArray: this._loadAsTypedArray,
+    loadAttributesAsTypedArray: this._loadAttributesAsTypedArray,
     loadIndicesForWireframe: this._loadIndicesForWireframe,
+    loadPrimitiveOutline: this._loadPrimitiveOutline,
   };
 
   if (gltfFormat === 0) {
@@ -262,27 +269,38 @@ I3dmLoader.prototype.load = function () {
 
   const that = this;
   gltfLoader.load();
-  gltfLoader.promise
+  this._promise = gltfLoader.promise
     .then(function () {
       if (that.isDestroyed()) {
         return;
       }
 
       const components = gltfLoader.components;
-      components.transform = that._transform;
+
+      // Combine the RTC_CENTER transform from the i3dm and the CESIUM_RTC
+      // transform from the glTF. In practice CESIUM_RTC is not set for
+      // instanced models but multiply the transforms just in case.
+      components.transform = Matrix4.multiplyTransformation(
+        that._transform,
+        components.transform,
+        components.transform
+      );
+
       createInstances(that, components);
       createStructuralMetadata(that, components);
       that._components = components;
 
       that._state = I3dmLoaderState.READY;
-      that._promise.resolve(that);
+      return that;
     })
     .catch(function (error) {
       if (that.isDestroyed()) {
         return;
       }
-      handleError(that, error);
+      return handleError(that, error);
     });
+
+  return this._promise;
 };
 
 function handleError(i3dmLoader, error) {
@@ -290,7 +308,7 @@ function handleError(i3dmLoader, error) {
   i3dmLoader._state = I3dmLoaderState.FAILED;
   const errorMessage = "Failed to load i3dm";
   error = i3dmLoader.getError(errorMessage, error);
-  i3dmLoader._promise.reject(error);
+  return Promise.reject(error);
 }
 
 I3dmLoader.prototype.process = function (frameState) {
@@ -340,6 +358,8 @@ function createStructuralMetadata(loader, components) {
 
 const positionScratch = new Cartesian3();
 const propertyScratch1 = new Array(4);
+const transformScratch = new Matrix4();
+
 function createInstances(loader, components) {
   let i;
   const featureTable = loader._featureTable;
@@ -410,8 +430,18 @@ function createInstances(loader, components) {
     }
 
     // Set the center of the bounding sphere as the RTC center transform.
-    components.transform = Matrix4.fromTranslation(
-      positionBoundingSphere.center
+    const centerTransform = Matrix4.fromTranslation(
+      positionBoundingSphere.center,
+      transformScratch
+    );
+
+    // Combine the center transform and the CESIUM_RTC transform from the glTF.
+    // In practice CESIUM_RTC is not set for instanced models but multiply the
+    // transforms just in case.
+    components.transform = Matrix4.multiplyTransformation(
+      centerTransform,
+      components.transform,
+      components.transform
     );
   }
 
@@ -482,7 +512,7 @@ function createInstances(loader, components) {
   translationAttribute.componentDatatype = ComponentDatatype.FLOAT;
   translationAttribute.type = AttributeType.VEC3;
   translationAttribute.count = instancesLength;
-  translationAttribute.packedTypedArray = translationTypedArray;
+  translationAttribute.typedArray = translationTypedArray;
   instances.attributes.push(translationAttribute);
 
   // Create rotation vertex attribute.
@@ -493,7 +523,7 @@ function createInstances(loader, components) {
     rotationAttribute.componentDatatype = ComponentDatatype.FLOAT;
     rotationAttribute.type = AttributeType.VEC4;
     rotationAttribute.count = instancesLength;
-    rotationAttribute.packedTypedArray = rotationTypedArray;
+    rotationAttribute.typedArray = rotationTypedArray;
     instances.attributes.push(rotationAttribute);
   }
 
@@ -505,7 +535,7 @@ function createInstances(loader, components) {
     scaleAttribute.componentDatatype = ComponentDatatype.FLOAT;
     scaleAttribute.type = AttributeType.VEC3;
     scaleAttribute.count = instancesLength;
-    scaleAttribute.packedTypedArray = scaleTypedArray;
+    scaleAttribute.typedArray = scaleTypedArray;
     instances.attributes.push(scaleAttribute);
   }
 
@@ -517,7 +547,7 @@ function createInstances(loader, components) {
   featureIdAttribute.componentDatatype = ComponentDatatype.FLOAT;
   featureIdAttribute.type = AttributeType.SCALAR;
   featureIdAttribute.count = instancesLength;
-  featureIdAttribute.packedTypedArray = featureIdArray;
+  featureIdAttribute.typedArray = featureIdArray;
   instances.attributes.push(featureIdAttribute);
 
   // Create feature ID attribute.
@@ -580,16 +610,17 @@ function getPositions(featureTable, instancesLength) {
       );
     }
 
+    const decodedPositions = new Float32Array(quantizedPositions.length);
     for (let i = 0; i < quantizedPositions.length / 3; i++) {
-      const quantizedPosition = quantizedPositions[i];
       for (let j = 0; j < 3; j++) {
-        quantizedPositions[3 * i + j] =
-          (quantizedPosition[j] / 65535.0) * quantizedVolumeScale[j] +
+        const index = 3 * i + j;
+        decodedPositions[index] =
+          (quantizedPositions[index] / 65535.0) * quantizedVolumeScale[j] +
           quantizedVolumeOffset[j];
       }
     }
 
-    return quantizedPositions;
+    return decodedPositions;
 
     // eslint-disable-next-line no-else-return
   } else {

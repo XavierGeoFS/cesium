@@ -2,9 +2,11 @@ import {
   AttributeType,
   Axis,
   Cartesian3,
+  CullFace,
   InstanceAttributeSemantic,
   Matrix4,
   ModelExperimentalUtility,
+  PrimitiveType,
   Quaternion,
   VertexAttributeSemantic,
 } from "../../../Source/Cesium.js";
@@ -391,5 +393,63 @@ describe("Scene/ModelExperimental/ModelExperimentalUtility", function () {
     expect(
       ModelExperimentalUtility.getFeatureIdsByLabel(featureIds, "other")
     ).not.toBeDefined();
+  });
+
+  function expectCullFace(matrix, primitiveType, cullFace) {
+    expect(ModelExperimentalUtility.getCullFace(matrix, primitiveType)).toBe(
+      cullFace
+    );
+  }
+
+  it("getCullFace returns CullFace.BACK when primitiveType is not triangles", function () {
+    const matrix = Matrix4.fromUniformScale(-1.0);
+    expectCullFace(matrix, PrimitiveType.POINTS, CullFace.BACK);
+    expectCullFace(matrix, PrimitiveType.LINES, CullFace.BACK);
+    expectCullFace(matrix, PrimitiveType.LINE_LOOP, CullFace.BACK);
+    expectCullFace(matrix, PrimitiveType.LINE_STRIP, CullFace.BACK);
+  });
+
+  it("getCullFace return CullFace.BACK when determinant is greater than zero", function () {
+    const matrix = Matrix4.IDENTITY;
+    expectCullFace(matrix, PrimitiveType.TRIANGLES, CullFace.BACK);
+    expectCullFace(matrix, PrimitiveType.TRIANGLE_STRIP, CullFace.BACK);
+    expectCullFace(matrix, PrimitiveType.TRIANGLE_FAN, CullFace.BACK);
+  });
+
+  it("getCullFace return CullFace.FRONT when determinant is less than zero", function () {
+    const matrix = Matrix4.fromUniformScale(-1.0);
+    expectCullFace(matrix, PrimitiveType.TRIANGLES, CullFace.FRONT);
+    expectCullFace(matrix, PrimitiveType.TRIANGLE_STRIP, CullFace.FRONT);
+    expectCullFace(matrix, PrimitiveType.TRIANGLE_FAN, CullFace.FRONT);
+  });
+
+  it("sanitizeGlslIdentifier removes non-alphanumeric characters", function () {
+    const identifier = "temperature ℃";
+    const result = ModelExperimentalUtility.sanitizeGlslIdentifier(identifier);
+    expect(result).toEqual("temperature_");
+  });
+
+  it("sanitizeGlslIdentifier removes consecutive underscores", function () {
+    const identifier = "custom__property";
+    const result = ModelExperimentalUtility.sanitizeGlslIdentifier(identifier);
+    expect(result).toEqual("custom_property");
+  });
+
+  it("sanitizeGlslIdentifier removes gl_ prefix", function () {
+    const identifier = "gl_customProperty";
+    const result = ModelExperimentalUtility.sanitizeGlslIdentifier(identifier);
+    expect(result).toEqual("customProperty");
+  });
+
+  it("sanitizeGlslIdentifier adds underscore to digit identifier", function () {
+    const identifier = "1234";
+    const result = ModelExperimentalUtility.sanitizeGlslIdentifier(identifier);
+    expect(result).toEqual("_1234");
+  });
+
+  it("sanitizeGlslIdentifier handles all cases", function () {
+    const identifier = "gl_1st__test℃_variable";
+    const result = ModelExperimentalUtility.sanitizeGlslIdentifier(identifier);
+    expect(result).toEqual("_1st_test_variable");
   });
 });

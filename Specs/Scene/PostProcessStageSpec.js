@@ -1,15 +1,18 @@
-import { BoundingRectangle } from "../../Source/Cesium.js";
-import { Cartesian3 } from "../../Source/Cesium.js";
-import { Color } from "../../Source/Cesium.js";
-import { defined } from "../../Source/Cesium.js";
-import { HeadingPitchRange } from "../../Source/Cesium.js";
-import { Matrix4 } from "../../Source/Cesium.js";
-import { PixelFormat } from "../../Source/Cesium.js";
-import { Transforms } from "../../Source/Cesium.js";
-import { PixelDatatype } from "../../Source/Cesium.js";
-import { Model } from "../../Source/Cesium.js";
-import { PostProcessStage } from "../../Source/Cesium.js";
-import { PostProcessStageSampleMode } from "../../Source/Cesium.js";
+import {
+  BoundingRectangle,
+  Cartesian3,
+  Color,
+  defined,
+  HeadingPitchRange,
+  Matrix4,
+  PixelFormat,
+  Transforms,
+  PixelDatatype,
+  Model,
+  PostProcessStage,
+  PostProcessStageSampleMode,
+} from "../../../Source/Cesium.js";
+
 import createScene from "../createScene.js";
 import pollToPromise from "../pollToPromise.js";
 
@@ -248,11 +251,12 @@ describe(
         const camera = scene.camera;
         const center = Matrix4.multiplyByPoint(
           model.modelMatrix,
-          model.boundingSphere.center,
+          model.boundingSphereInternal.center,
           new Cartesian3()
         );
         const r =
-          4.0 * Math.max(model.boundingSphere.radius, camera.frustum.near);
+          4.0 *
+          Math.max(model.boundingSphereInternal.radius, camera.frustum.near);
         camera.lookAt(center, new HeadingPitchRange(0.0, 0.0, r));
       };
 

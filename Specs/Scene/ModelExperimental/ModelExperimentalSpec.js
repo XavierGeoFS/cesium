@@ -1,30 +1,41 @@
 import {
+  Axis,
   Cartesian2,
+  Cartesian3,
   Cesium3DTileStyle,
+  CesiumTerrainProvider,
   ClippingPlane,
   ClippingPlaneCollection,
-  FeatureDetection,
-  ImageBasedLighting,
-  JulianDate,
-  defaultValue,
-  Matrix4,
-  Math as CesiumMath,
-  ResourceCache,
-  Resource,
-  ModelExperimental,
-  Cartesian3,
-  defined,
-  HeadingPitchRange,
-  ShaderProgram,
-  ModelFeature,
-  Axis,
   Color,
-  StyleCommandsNeeded,
+  Credit,
+  defaultValue,
+  defined,
+  DistanceDisplayCondition,
+  Ellipsoid,
+  Event,
+  FeatureDetection,
+  HeadingPitchRange,
+  HeadingPitchRoll,
+  HeightReference,
+  ImageBasedLighting,
+  JobScheduler,
+  JulianDate,
+  Math as CesiumMath,
+  Matrix4,
+  ModelExperimental,
   ModelExperimentalSceneGraph,
+  ModelFeature,
+  Pass,
   PrimitiveType,
+  Resource,
+  ResourceCache,
+  ShaderProgram,
+  StyleCommandsNeeded,
+  Transforms,
   WireframeIndexGenerator,
 } from "../../../Source/Cesium.js";
 import createScene from "../../createScene.js";
+import pollToPromise from "../../pollToPromise.js";
 import loadAndZoomToModelExperimental from "./loadAndZoomToModelExperimental.js";
 
 describe(
@@ -65,24 +76,70 @@ describe(
     );
     const pointCloudUrl =
       "./Data/Models/GltfLoader/PointCloudWithRGBColors/glTF-Binary/PointCloudWithRGBColors.glb";
+    const boxArticulationsUrl =
+      "./Data/Models/GltfLoader/BoxArticulations/glTF/BoxArticulations.gltf";
+
+    // prettier-ignore
+    const boxArticulationsMatrix = Matrix4.fromRowMajorArray([
+      1, 0, 0, 0,
+      0, 0, 1, 0,
+      0, -1, 0, 0,
+      0, 0, 0, 1
+    ]);
+
+    const fixedFrameTransform = Transforms.localFrameToFixedFrameGenerator(
+      "north",
+      "west"
+    );
+
+    const modelMatrix = Transforms.headingPitchRollToFixedFrame(
+      Cartesian3.fromDegrees(-123.0744619, 44.0503706, 0),
+      new HeadingPitchRoll(0, 0, 0),
+      Ellipsoid.WGS84,
+      fixedFrameTransform
+    );
 
     let scene;
+    let scene2D;
+    let sceneCV;
+    let sceneWithMockGlobe;
     let sceneWithWebgl2;
 
     beforeAll(function () {
       scene = createScene();
+
+      scene2D = createScene();
+      scene2D.morphTo2D(0.0);
+
+      sceneCV = createScene();
+      sceneCV.morphToColumbusView(0.0);
+
+      sceneWithMockGlobe = createScene();
+
       sceneWithWebgl2 = createScene({
-        requestWebgl2: true,
+        contextOptions: {
+          requestWebgl2: true,
+        },
       });
+    });
+
+    beforeEach(function () {
+      sceneWithMockGlobe.globe = createMockGlobe();
     });
 
     afterAll(function () {
       scene.destroyForSpecs();
+      scene2D.destroyForSpecs();
+      sceneCV.destroyForSpecs();
+      sceneWithMockGlobe.destroyForSpecs();
       sceneWithWebgl2.destroyForSpecs();
     });
 
     afterEach(function () {
       scene.primitives.removeAll();
+      scene2D.primitives.removeAll();
+      sceneCV.primitives.removeAll();
+      sceneWithMockGlobe.primitives.removeAll();
       sceneWithWebgl2.primitives.removeAll();
       ResourceCache.clearForSpecs();
     });
@@ -91,11 +148,7 @@ describe(
       zoom = defaultValue(zoom, 4.0);
 
       const camera = scene.camera;
-      const center = Matrix4.multiplyByPoint(
-        model.modelMatrix,
-        model.boundingSphere.center,
-        new Cartesian3()
-      );
+      const center = model.boundingSphere.center;
       const r =
         zoom * Math.max(model.boundingSphere.radius, camera.frustum.near);
       camera.lookAt(center, new HeadingPitchRange(0.0, 0.0, r));
@@ -116,7 +169,10 @@ describe(
         options.backgroundColor,
         Color.BLACK
       );
-      scene.backgroundColor = backgroundColor;
+
+      const targetScene = defaultValue(options.scene, scene);
+
+      targetScene.backgroundColor = backgroundColor;
       const backgroundColorBytes = backgroundColor.toBytes(scratchBytes);
 
       const time = defaultValue(
@@ -125,7 +181,7 @@ describe(
       );
 
       expect({
-        scene: scene,
+        scene: targetScene,
         time: time,
       }).toRenderAndCall(function (rgba) {
         if (shouldRender) {
@@ -135,7 +191,7 @@ describe(
         }
       });
 
-      scene.backgroundColor = Color.BLACK;
+      targetScene.backgroundColor = Color.BLACK;
     }
 
     function verifyDebugWireframe(model, primitiveType, options) {
@@ -143,7 +199,7 @@ describe(
       const modelHasIndices = defaultValue(options.hasIndices, true);
       const targetScene = defaultValue(options.scene, scene);
 
-      const commandList = targetScene.frameState;
+      const commandList = targetScene.frameState.commandList;
       const commandCounts = [];
       let i, command;
 
@@ -185,6 +241,55 @@ describe(
         }
         expect(command.count).toEqual(commandCounts[i]);
       }
+    }
+
+    function createMockGlobe() {
+      const globe = {
+        callback: undefined,
+        removedCallback: false,
+        ellipsoid: Ellipsoid.WGS84,
+        update: function () {},
+        render: function () {},
+        getHeight: function () {
+          return 0.0;
+        },
+        _surface: {
+          tileProvider: {
+            ready: true,
+          },
+          _tileLoadQueueHigh: [],
+          _tileLoadQueueMedium: [],
+          _tileLoadQueueLow: [],
+          _debug: {
+            tilesWaitingForChildren: 0,
+          },
+        },
+        imageryLayersUpdatedEvent: new Event(),
+        destroy: function () {},
+      };
+
+      globe.beginFrame = function () {};
+
+      globe.endFrame = function () {};
+
+      globe.terrainProviderChanged = new Event();
+      Object.defineProperties(globe, {
+        terrainProvider: {
+          set: function (value) {
+            this.terrainProviderChanged.raiseEvent(value);
+          },
+        },
+      });
+
+      globe._surface.updateHeight = function (position, callback) {
+        globe.callback = callback;
+        return function () {
+          globe.removedCallback = true;
+          globe.callback = undefined;
+        };
+      };
+
+      return globe;
     }
 
     it("initializes and renders from Uint8Array", function () {
@@ -267,32 +372,60 @@ describe(
       });
     });
 
-    // Throws an extraneous promise through the texture loader which cannot be cleanly caught
-    // https://github.com/CesiumGS/cesium/issues/10178
-    xit("rejects ready promise when texture fails to load", function () {
-      const resource = Resource.createIfNeeded(boxTexturedGltfUrl);
-      return resource.fetchJson().then(function (gltf) {
-        gltf.images[0].uri = "non-existent-path.png";
-        return loadAndZoomToModelExperimental(
-          {
-            gltf: gltf,
-            basePath: boxTexturedGltfUrl,
-            incrementallyLoadTextures: false,
-          },
-          scene
-        )
-          .then(function (model) {
-            fail();
-          })
-          .catch(function (error) {
-            expect(error).toBeDefined();
-          });
+    it("initializes and renders with url", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          url: boxTexturedGltfUrl,
+        },
+        scene
+      ).then(function (model) {
+        expect(model.ready).toEqual(true);
+        expect(model._sceneGraph).toBeDefined();
+        expect(model._resourcesLoaded).toEqual(true);
+        verifyRender(model, true);
       });
     });
 
-    // Throws an extraneous promise through the texture loader which cannot be cleanly caught
-    // https://github.com/CesiumGS/cesium/issues/10178
-    xit("rejects ready promise when external buffer fails to load", function () {
+    it("rejects ready promise when texture fails to load", function () {
+      const resource = Resource.createIfNeeded(boxTexturedGltfUrl);
+      return resource.fetchJson().then(function (gltf) {
+        gltf.images[0].uri = "non-existent-path.png";
+        const model = ModelExperimental.fromGltf({
+          gltf: gltf,
+          basePath: boxTexturedGltfUrl,
+          incrementallyLoadTextures: false,
+        });
+        scene.primitives.add(model);
+        let finished = false;
+        model.readyPromise
+          .then(function (model) {
+            finished = true;
+            fail();
+          })
+          .catch(function (error) {
+            finished = true;
+            expect(error).toBeDefined();
+          });
+
+        let texturesFinished = false;
+        model.texturesLoadedPromise
+          .then(function () {
+            texturesFinished = true;
+            fail();
+          })
+          .catch(function (error) {
+            texturesFinished = true;
+            expect(error).toBeDefined();
+          });
+
+        return pollToPromise(function () {
+          scene.renderForSpecs();
+          return finished && texturesFinished;
+        });
+      });
+    });
+
+    it("rejects ready promise when external buffer fails to load", function () {
       const resource = Resource.createIfNeeded(boxTexturedGltfUrl);
       return resource.fetchJson().then(function (gltf) {
         gltf.buffers[0].uri = "non-existent-path.bin";
@@ -309,6 +442,46 @@ describe(
           .catch(function (error) {
             expect(error).toBeDefined();
           });
+      });
+    });
+
+    it("loads with asynchronous set to true", function () {
+      const jobSchedulerExecute = spyOn(
+        JobScheduler.prototype,
+        "execute"
+      ).and.callThrough();
+
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          asynchronous: true,
+        },
+        scene
+      ).then(function (model) {
+        const loader = model.loader;
+        expect(loader._asynchronous).toBe(true);
+
+        expect(jobSchedulerExecute).toHaveBeenCalled();
+      });
+    });
+
+    it("loads with asynchronous set to false", function () {
+      const jobSchedulerExecute = spyOn(
+        JobScheduler.prototype,
+        "execute"
+      ).and.callThrough();
+
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          asynchronous: false,
+        },
+        scene
+      ).then(function (model) {
+        const loader = model.loader;
+        expect(loader._asynchronous).toBe(false);
+
+        expect(jobSchedulerExecute).not.toHaveBeenCalled();
       });
     });
 
@@ -390,6 +563,52 @@ describe(
       });
     });
 
+    it("initializes with credit", function () {
+      const credit = new Credit("User Credit");
+      const resource = Resource.createIfNeeded(boxTexturedGltfUrl);
+      return resource.fetchJson().then(function (gltf) {
+        return loadAndZoomToModelExperimental(
+          {
+            gltf: gltf,
+            basePath: boxTexturedGltfUrl,
+            credit: credit,
+          },
+          scene
+        ).then(function (model) {
+          scene.renderForSpecs();
+          const creditDisplay = scene.frameState.creditDisplay;
+          const credits =
+            creditDisplay._currentFrameCredits.lightboxCredits.values;
+          const length = credits.length;
+          expect(length).toEqual(1);
+          expect(credits[0].credit.html).toEqual("User Credit");
+        });
+      });
+    });
+
+    it("initializes with credit string", function () {
+      const creditString = "User Credit";
+      const resource = Resource.createIfNeeded(boxTexturedGltfUrl);
+      return resource.fetchJson().then(function (gltf) {
+        return loadAndZoomToModelExperimental(
+          {
+            gltf: gltf,
+            basePath: boxTexturedGltfUrl,
+            credit: creditString,
+          },
+          scene
+        ).then(function (model) {
+          scene.renderForSpecs();
+          const creditDisplay = scene.frameState.creditDisplay;
+          const credits =
+            creditDisplay._currentFrameCredits.lightboxCredits.values;
+          const length = credits.length;
+          expect(length).toEqual(1);
+          expect(credits[0].credit.html).toEqual(creditString);
+        });
+      });
+    });
+
     it("gets copyrights from gltf", function () {
       const resource = Resource.createIfNeeded(boxWithCreditsUrl);
       return resource.fetchJson().then(function (gltf) {
@@ -419,18 +638,53 @@ describe(
       });
     });
 
-    it("shows credits on screen", function () {
+    it("displays all types of credits", function () {
       const resource = Resource.createIfNeeded(boxWithCreditsUrl);
       return resource.fetchJson().then(function (gltf) {
         return loadAndZoomToModelExperimental(
           {
             gltf: gltf,
             basePath: boxWithCreditsUrl,
+            credit: "User Credit",
+          },
+          scene
+        ).then(function (model) {
+          model._resourceCredits = [new Credit("Resource Credit")];
+          const expectedCredits = [
+            "User Credit",
+            "Resource Credit",
+            "First Source",
+            "Second Source",
+            "Third Source",
+          ];
+
+          scene.renderForSpecs();
+          const creditDisplay = scene.frameState.creditDisplay;
+          const credits =
+            creditDisplay._currentFrameCredits.lightboxCredits.values;
+          const length = credits.length;
+          expect(length).toEqual(expectedCredits.length);
+          for (let i = 0; i < length; i++) {
+            expect(credits[i].credit.html).toEqual(expectedCredits[i]);
+          }
+        });
+      });
+    });
+
+    it("initializes with showCreditsOnScreen", function () {
+      const resource = Resource.createIfNeeded(boxWithCreditsUrl);
+      return resource.fetchJson().then(function (gltf) {
+        return loadAndZoomToModelExperimental(
+          {
+            gltf: gltf,
+            basePath: boxWithCreditsUrl,
+            credit: "User Credit",
             showCreditsOnScreen: true,
           },
           scene
         ).then(function (model) {
           const expectedCredits = [
+            "User Credit",
             "First Source",
             "Second Source",
             "Third Source",
@@ -449,18 +703,20 @@ describe(
       });
     });
 
-    it("toggles showing credits on screen", function () {
+    it("changing showCreditsOnScreen works", function () {
       const resource = Resource.createIfNeeded(boxWithCreditsUrl);
       return resource.fetchJson().then(function (gltf) {
         return loadAndZoomToModelExperimental(
           {
             gltf: gltf,
             basePath: boxWithCreditsUrl,
+            credit: "User Credit",
             showCreditsOnScreen: false,
           },
           scene
         ).then(function (model) {
           const expectedCredits = [
+            "User Credit",
             "First Source",
             "Second Source",
             "Third Source",
@@ -501,6 +757,31 @@ describe(
       });
     });
 
+    it("showCreditsOnScreen overrides existing credit setting", function () {
+      const resource = Resource.createIfNeeded(boxTexturedGltfUrl);
+      return resource.fetchJson().then(function (gltf) {
+        return loadAndZoomToModelExperimental(
+          {
+            gltf: gltf,
+            basePath: boxTexturedGltfUrl,
+            credit: new Credit("User Credit", false),
+            showCreditsOnScreen: true,
+          },
+          scene
+        ).then(function (model) {
+          scene.renderForSpecs();
+          const creditDisplay = scene.frameState.creditDisplay;
+          const credits =
+            creditDisplay._currentFrameCredits.screenCredits.values;
+          const length = credits.length;
+          expect(length).toEqual(1);
+          for (let i = 0; i < length; i++) {
+            expect(credits[i].credit.html).toEqual("User Credit");
+          }
+        });
+      });
+    });
+
     it("show works", function () {
       const resource = Resource.createIfNeeded(boxTexturedGlbUrl);
       const loadPromise = resource.fetchArrayBuffer();
@@ -516,6 +797,126 @@ describe(
           expect(model.show).toEqual(true);
           verifyRender(model, true);
         });
+      });
+    });
+
+    it("renders in 2D", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+        },
+        scene2D
+      ).then(function (model) {
+        expect(model.ready).toEqual(true);
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: scene2D,
+        });
+      });
+    });
+
+    it("renders in 2D over the IDL", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(180.0, 0.0)
+          ),
+        },
+        scene2D
+      ).then(function (model) {
+        expect(model.ready).toEqual(true);
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: scene2D,
+        });
+
+        model.modelMatrix = Transforms.eastNorthUpToFixedFrame(
+          Cartesian3.fromDegrees(-180.0, 0.0)
+        );
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: scene2D,
+        });
+      });
+    });
+
+    it("renders in CV", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+        },
+        sceneCV
+      ).then(function (model) {
+        expect(model.ready).toEqual(true);
+        scene.camera.moveBackward(1.0);
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: sceneCV,
+        });
+      });
+    });
+
+    it("projectTo2D works for 2D", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+          projectTo2D: true,
+        },
+        scene2D
+      ).then(function (model) {
+        expect(model.ready).toEqual(true);
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: scene2D,
+        });
+      });
+    });
+
+    it("projectTo2D works for CV", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+          projectTo2D: true,
+        },
+        sceneCV
+      ).then(function (model) {
+        expect(model.ready).toEqual(true);
+        sceneCV.camera.moveBackward(1.0);
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: sceneCV,
+        });
+      });
+    });
+
+    it("does not render during morph", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+          projectTo2D: true,
+        },
+        scene
+      ).then(function (model) {
+        const commandList = scene.frameState.commandList;
+        expect(model.ready).toEqual(true);
+
+        scene.renderForSpecs();
+        expect(commandList.length).toBeGreaterThan(0);
+
+        scene.morphTo2D(1.0);
+        scene.renderForSpecs();
+        expect(commandList.length).toBe(0);
+
+        scene.completeMorph();
+        scene.morphTo3D(0.0);
+        scene.renderForSpecs();
+        expect(commandList.length).toBeGreaterThan(0);
       });
     });
 
@@ -540,7 +941,7 @@ describe(
           { gltf: new Uint8Array(buffer), enableDebugWireframe: false },
           scene
         ).then(function (model) {
-          const commandList = scene.frameState;
+          const commandList = scene.frameState.commandList;
           const commandCounts = [];
           let i, command;
           scene.renderForSpecs();
@@ -615,16 +1016,19 @@ describe(
         { gltf: pointCloudUrl, enableDebugWireframe: true },
         scene
       ).then(function (model) {
-        const commandList = scene.frameState;
-        let i, command;
+        let i;
+        scene.renderForSpecs();
+        const commandList = scene.frameState.commandList;
         for (i = 0; i < commandList.length; i++) {
-          expect(commandList[i].primitiveType).toBe(PrimitiveType.POINTS);
+          const command = commandList[i];
+          expect(command.primitiveType).toBe(PrimitiveType.POINTS);
           expect(command.vertexArray.indexBuffer).toBeUndefined();
         }
 
         model.debugWireframe = true;
         for (i = 0; i < commandList.length; i++) {
-          expect(commandList[i].primitiveType).toBe(PrimitiveType.POINTS);
+          const command = commandList[i];
+          expect(command.primitiveType).toBe(PrimitiveType.POINTS);
           expect(command.vertexArray.indexBuffer).toBeUndefined();
         }
       });
@@ -640,7 +1044,7 @@ describe(
         ).then(function (model) {
           let i;
           scene.renderForSpecs();
-          const commandList = scene.frameState;
+          const commandList = scene.frameState.commandList;
           for (i = 0; i < commandList.length; i++) {
             expect(commandList[i].debugShowBoundingVolume).toBe(true);
           }
@@ -659,7 +1063,7 @@ describe(
       const loadPromise = resource.fetchArrayBuffer();
       return loadPromise.then(function (buffer) {
         return loadAndZoomToModelExperimental(
-          { gltf: new Uint8Array(buffer), debugShowBoundingVolume: true },
+          { gltf: new Uint8Array(buffer) },
           scene
         ).then(function (model) {
           const boundingSphere = model.boundingSphere;
@@ -742,6 +1146,55 @@ describe(
       }).toThrowDeveloperError();
     });
 
+    it("initializes with id", function () {
+      // This model gets clipped if log depth is disabled, so zoom out
+      // the camera just a little
+      const offset = new HeadingPitchRange(0, -CesiumMath.PI_OVER_FOUR, 2);
+
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          offset: offset,
+          id: boxTexturedGlbUrl,
+        },
+        scene
+      ).then(function (model) {
+        expect(model.id).toBe(boxTexturedGlbUrl);
+
+        const pickIds = model._pickIds;
+        expect(pickIds.length).toEqual(1);
+        expect(pickIds[0].object.id).toEqual(boxTexturedGlbUrl);
+      });
+    });
+
+    it("changing id works", function () {
+      // This model gets clipped if log depth is disabled, so zoom out
+      // the camera just a little
+      const offset = new HeadingPitchRange(0, -CesiumMath.PI_OVER_FOUR, 2);
+
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          offset: offset,
+        },
+        scene
+      ).then(function (model) {
+        expect(model.id).toBeUndefined();
+
+        const pickIds = model._pickIds;
+        expect(pickIds.length).toEqual(1);
+        expect(pickIds[0].object.id).toBeUndefined();
+
+        model.id = boxTexturedGlbUrl;
+        scene.renderForSpecs();
+        expect(pickIds[0].object.id).toBe(boxTexturedGlbUrl);
+
+        model.id = undefined;
+        scene.renderForSpecs();
+        expect(pickIds[0].object.id).toBeUndefined();
+      });
+    });
+
     it("picks box textured", function () {
       if (FeatureDetection.isInternetExplorer()) {
         // Workaround IE 11.0.9.  This test fails when all tests are ran without a breakpoint here.
@@ -766,16 +1219,47 @@ describe(
       });
     });
 
+    it("picks box textured with id", function () {
+      if (FeatureDetection.isInternetExplorer()) {
+        // Workaround IE 11.0.9.  This test fails when all tests are ran without a breakpoint here.
+        return;
+      }
+
+      // This model gets clipped if log depth is disabled, so zoom out
+      // the camera just a little
+      const offset = new HeadingPitchRange(0, -CesiumMath.PI_OVER_FOUR, 2);
+
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          offset: offset,
+          id: boxTexturedGlbUrl,
+        },
+        scene
+      ).then(function (model) {
+        expect(scene).toPickAndCall(function (result) {
+          expect(result.primitive).toBeInstanceOf(ModelExperimental);
+          expect(result.primitive).toEqual(model);
+          expect(result.id).toEqual(boxTexturedGlbUrl);
+        });
+      });
+    });
+
     it("doesn't pick when allowPicking is false", function () {
       if (FeatureDetection.isInternetExplorer()) {
         // Workaround IE 11.0.9.  This test fails when all tests are ran without a breakpoint here.
         return;
       }
 
+      // This model gets clipped if log depth is disabled, so zoom out
+      // the camera just a little
+      const offset = new HeadingPitchRange(0, -CesiumMath.PI_OVER_FOUR, 2);
+
       return loadAndZoomToModelExperimental(
         {
           gltf: boxTexturedGlbUrl,
           allowPicking: false,
+          offset: offset,
         },
         scene
       ).then(function () {
@@ -936,8 +1420,8 @@ describe(
         expect(Matrix4.equals(sceneGraph.computedModelMatrix, transform)).toBe(
           true
         );
-        verifyRender(model, false);
         expect(model.boundingSphere.center).toEqual(translation);
+        verifyRender(model, true);
 
         expect(sceneGraph.computedModelMatrix).not.toBe(transform);
         expect(model.modelMatrix).not.toBe(transform);
@@ -945,6 +1429,7 @@ describe(
     });
 
     it("changing model matrix works", function () {
+      const translation = new Cartesian3(10, 0, 0);
       const updateModelMatrix = spyOn(
         ModelExperimentalSceneGraph.prototype,
         "updateModelMatrix"
@@ -956,8 +1441,7 @@ describe(
         verifyRender(model, true);
         const sceneGraph = model.sceneGraph;
 
-        const transform = Matrix4.fromTranslation(new Cartesian3(10, 0, 0));
-
+        const transform = Matrix4.fromTranslation(translation);
         Matrix4.multiplyTransformation(
           model.modelMatrix,
           transform,
@@ -969,7 +1453,10 @@ describe(
         expect(Matrix4.equals(sceneGraph.computedModelMatrix, transform)).toBe(
           true
         );
-        verifyRender(model, false);
+        // Keep the camera in-place to confirm that the model matrix moves the model out of view.
+        verifyRender(model, false, {
+          zoomToModel: false,
+        });
       });
     });
 
@@ -990,7 +1477,634 @@ describe(
         scene.renderForSpecs();
 
         expect(model.boundingSphere.center).toEqual(translation);
+      });
+    });
+
+    it("changing model matrix in 2D mode works if projectTo2D is false", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+        },
+        scene2D
+      ).then(function (model) {
+        verifyRender(model, true, {
+          zoomToModel: false,
+          scene: scene2D,
+        });
+
+        model.modelMatrix = Matrix4.fromTranslation(new Cartesian3(10, 10, 10));
+        verifyRender(model, false, {
+          zoomToModel: false,
+          scene: scene2D,
+        });
+      });
+    });
+
+    it("changing model matrix in 2D mode throws if projectTo2D is true", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: modelMatrix,
+          projectTo2D: true,
+        },
+        scene2D
+      ).then(function (model) {
+        expect(function () {
+          model.modelMatrix = Matrix4.IDENTITY;
+          scene2D.renderForSpecs();
+        }).toThrowDeveloperError();
+      });
+    });
+
+    it("initializes with height reference", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(model.heightReference).toEqual(HeightReference.CLAMP_TO_GROUND);
+        expect(model._scene).toBe(sceneWithMockGlobe);
+        expect(model._clampedModelMatrix).toBeDefined();
+      });
+    });
+
+    it("changing height reference works", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          heightReference: HeightReference.NONE,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(model.heightReference).toEqual(HeightReference.NONE);
+        expect(model._clampedModelMatrix).toBeUndefined();
+
+        model.heightReference = HeightReference.CLAMP_TO_GROUND;
+        expect(model._heightDirty).toBe(true);
+
+        sceneWithMockGlobe.renderForSpecs();
+        expect(model._heightDirty).toBe(false);
+        expect(model.heightReference).toEqual(HeightReference.CLAMP_TO_GROUND);
+        expect(model._clampedModelMatrix).toBeDefined();
+      });
+    });
+
+    it("creates height update callback when initializing with height reference", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(model.heightReference).toEqual(HeightReference.CLAMP_TO_GROUND);
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+      });
+    });
+
+    it("creates height update callback after setting height reference", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.NONE,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(model.heightReference).toEqual(HeightReference.NONE);
+        expect(sceneWithMockGlobe.globe.callback).toBeUndefined();
+
+        model.heightReference = HeightReference.CLAMP_TO_GROUND;
+        expect(model.heightReference).toEqual(HeightReference.CLAMP_TO_GROUND);
+        sceneWithMockGlobe.renderForSpecs();
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+      });
+    });
+
+    it("updates height reference callback when the height reference changes", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+
+        model.heightReference = HeightReference.RELATIVE_TO_GROUND;
+        sceneWithMockGlobe.renderForSpecs();
+        expect(sceneWithMockGlobe.globe.removedCallback).toEqual(true);
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+
+        sceneWithMockGlobe.globe.removedCallback = false;
+        model.heightReference = HeightReference.NONE;
+        sceneWithMockGlobe.renderForSpecs();
+        expect(sceneWithMockGlobe.globe.removedCallback).toEqual(true);
+        expect(sceneWithMockGlobe.globe.callback).toBeUndefined();
+      });
+    });
+
+    it("updates height reference callback when the model matrix changes", function () {
+      const modelMatrix = Transforms.eastNorthUpToFixedFrame(
+        Cartesian3.fromDegrees(-72.0, 40.0)
+      );
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Matrix4.clone(modelMatrix),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+
+        // Modify the model matrix in place
+        const position = Cartesian3.fromDegrees(-73.0, 40.0);
+        model.modelMatrix[12] = position.x;
+        model.modelMatrix[13] = position.y;
+        model.modelMatrix[14] = position.z;
+
+        sceneWithMockGlobe.renderForSpecs();
+        expect(sceneWithMockGlobe.globe.removedCallback).toEqual(true);
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+
+        // Replace the model matrix entirely
+        model.modelMatrix = modelMatrix;
+
+        sceneWithMockGlobe.renderForSpecs();
+        expect(sceneWithMockGlobe.globe.removedCallback).toEqual(true);
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+      });
+    });
+
+    it("height reference callback updates the position", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+
+        sceneWithMockGlobe.globe.callback(
+          Cartesian3.fromDegrees(-72.0, 40.0, 100.0)
+        );
+        const matrix = model._clampedModelMatrix;
+        const position = new Cartesian3(matrix[12], matrix[13], matrix[14]);
+        const ellipsoid = sceneWithMockGlobe.globe.ellipsoid;
+        const cartographic = ellipsoid.cartesianToCartographic(position);
+        expect(cartographic.height).toEqualEpsilon(100.0, CesiumMath.EPSILON9);
+      });
+    });
+
+    it("height reference accounts for change in terrain provider", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(model._heightDirty).toBe(false);
+        const terrainProvider = new CesiumTerrainProvider({
+          url: "made/up/url",
+          requestVertexNormals: true,
+        });
+        sceneWithMockGlobe.terrainProvider = terrainProvider;
+
+        expect(model._heightDirty).toBe(true);
+        sceneWithMockGlobe.terrainProvider = undefined;
+      });
+    });
+
+    it("throws when initializing height reference with no scene", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: undefined,
+        },
+        sceneWithMockGlobe
+      ).catch(function (error) {
+        expect(error.message).toEqual(
+          "Height reference is not supported without a scene and globe."
+        );
+      });
+    });
+
+    it("throws when changing height reference with no scene", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.NONE,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(function () {
+          model.heightReference = HeightReference.CLAMP_TO_GROUND;
+          sceneWithMockGlobe.renderForSpecs();
+        }).toThrowDeveloperError();
+      });
+    });
+
+    it("throws when initializing height reference with no globe", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: scene,
+        },
+        scene
+      ).catch(function (error) {
+        expect(error.message).toEqual(
+          "Height reference is not supported without a scene and globe."
+        );
+      });
+    });
+
+    it("throws when changing height reference with no globe", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          scene: scene,
+        },
+        scene
+      ).then(function (model) {
+        expect(function () {
+          model.heightReference = HeightReference.CLAMP_TO_GROUND;
+          scene.renderForSpecs();
+        }).toThrowDeveloperError();
+      });
+    });
+
+    it("initializes with distance display condition", function () {
+      const near = 10.0;
+      const far = 100.0;
+      const condition = new DistanceDisplayCondition(near, far);
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          distanceDisplayCondition: condition,
+        },
+        scene
+      ).then(function (model) {
         verifyRender(model, false);
+      });
+    });
+
+    it("changing distance display condition works", function () {
+      const near = 10.0;
+      const far = 100.0;
+      const condition = new DistanceDisplayCondition(near, far);
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+
+        model.distanceDisplayCondition = condition;
+        verifyRender(model, false);
+
+        model.distanceDisplayCondition = undefined;
+        verifyRender(model, true);
+      });
+    });
+
+    it("distanceDisplayCondition works with camera movement", function () {
+      const near = 10.0;
+      const far = 100.0;
+      const condition = new DistanceDisplayCondition(near, far);
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+
+        // Model distance is smaller than near value, should not render
+        model.distanceDisplayCondition = condition;
+        verifyRender(model, false);
+
+        const frameState = scene.frameState;
+
+        // Model distance is between near and far values, should render
+        frameState.camera.lookAt(
+          Cartesian3.ZERO,
+          new HeadingPitchRange(0.0, 0.0, (far + near) * 0.5)
+        );
+        verifyRender(model, true, {
+          zoomToModel: false,
+        });
+
+        // Model distance is greater than far value, should not render
+        frameState.camera.lookAt(
+          Cartesian3.ZERO,
+          new HeadingPitchRange(0.0, 0.0, far + 10.0)
+        );
+        verifyRender(model, false, {
+          zoomToModel: false,
+        });
+      });
+    });
+
+    it("distanceDisplayCondition throws when near >= far", function () {
+      const near = 101.0;
+      const far = 100.0;
+      const condition = new DistanceDisplayCondition(near, far);
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+        },
+        scene
+      ).then(function (model) {
+        expect(function () {
+          model.distanceDisplayCondition = condition;
+        }).toThrowDeveloperError();
+      });
+    });
+
+    it("initializes with model color", function () {
+      return loadAndZoomToModelExperimental(
+        { gltf: boxTexturedGltfUrl, color: Color.BLACK },
+        scene
+      ).then(function (model) {
+        verifyRender(model, false);
+      });
+    });
+
+    it("changing model color works", function () {
+      return loadAndZoomToModelExperimental(
+        { gltf: boxTexturedGltfUrl },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+
+        model.color = Color.BLACK;
+        verifyRender(model, false);
+
+        model.color = Color.RED;
+        verifyRender(model, true);
+
+        model.color = undefined;
+        verifyRender(model, true);
+      });
+    });
+
+    it("invisible model doesn't render", function () {
+      return loadAndZoomToModelExperimental(
+        { gltf: boxTexturedGltfUrl, color: Color.fromAlpha(Color.BLACK, 0.0) },
+        scene
+      ).then(function (model) {
+        verifyRender(model, false);
+
+        // No commands should have been submitted
+        const commands = scene.frameState.commandList;
+        expect(commands.length).toBe(0);
+      });
+    });
+
+    it("initializes with silhouette size", function () {
+      return loadAndZoomToModelExperimental(
+        { gltf: boxTexturedGltfUrl, silhouetteSize: 1.0 },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.OPAQUE);
+      });
+    });
+
+    it("changing silhouette size works", function () {
+      return loadAndZoomToModelExperimental(
+        { gltf: boxTexturedGltfUrl },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(1);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(false);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+
+        model.silhouetteSize = 1.0;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.OPAQUE);
+
+        model.silhouetteSize = 0.0;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(1);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(false);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+      });
+    });
+
+    it("silhouette works with translucent color", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          silhouetteSize: 1.0,
+          silhouetteColor: Color.fromAlpha(Color.GREEN, 0.5),
+        },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.TRANSLUCENT);
+      });
+    });
+
+    it("silhouette is disabled by invisible color", function () {
+      return loadAndZoomToModelExperimental(
+        { gltf: boxTexturedGltfUrl, silhouetteSize: 1.0 },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.OPAQUE);
+
+        model.silhouetteColor = Color.fromAlpha(Color.GREEN, 0.0);
+        scene.renderForSpecs();
+        expect(commands.length).toBe(1);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(false);
+        expect(commands[0].pass).toBe(Pass.OPAQUE);
+      });
+    });
+
+    it("silhouette works for invisible model", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          silhouetteSize: 1.0,
+          color: Color.fromAlpha(Color.WHITE, 0.0),
+        },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+        expect(commands[0].renderState.colorMask).toEqual({
+          red: false,
+          green: false,
+          blue: false,
+          alpha: false,
+        });
+        expect(commands[0].renderState.depthMask).toEqual(false);
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.TRANSLUCENT);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.TRANSLUCENT);
+      });
+    });
+
+    it("silhouette works for translucent model", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          silhouetteSize: 1.0,
+          color: Color.fromAlpha(Color.WHITE, 0.5),
+        },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+
+        // Even though the silhouette color is opaque, the silhouette
+        // needs to be placed in the translucent pass.
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.TRANSLUCENT);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.TRANSLUCENT);
+      });
+    });
+
+    it("silhouette works for translucent model and translucent silhouette color", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          silhouetteSize: 1.0,
+          color: Color.fromAlpha(Color.WHITE, 0.5),
+          silhouetteColor: Color.fromAlpha(Color.RED, 0.5),
+        },
+        scene
+      ).then(function (model) {
+        const commands = scene.frameState.commandList;
+        scene.renderForSpecs();
+        expect(commands.length).toBe(2);
+
+        expect(commands[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[0].pass).toBe(Pass.TRANSLUCENT);
+        expect(commands[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commands[1].pass).toBe(Pass.TRANSLUCENT);
+      });
+    });
+
+    it("silhouette works for multiple models", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGltfUrl,
+          silhouetteSize: 1.0,
+        },
+        scene
+      ).then(function (model) {
+        return loadAndZoomToModelExperimental(
+          {
+            gltf: boxTexturedGltfUrl,
+            silhouetteSize: 1.0,
+          },
+          scene
+        ).then(function (model2) {
+          const commands = scene.frameState.commandList;
+          scene.renderForSpecs();
+          const length = commands.length;
+          expect(length).toBe(4);
+          for (let i = 0; i < length; i++) {
+            const command = commands[i];
+            expect(command.renderState.stencilTest.enabled).toBe(true);
+            expect(command.pass).toBe(Pass.OPAQUE);
+          }
+
+          const reference1 = commands[0].renderState.stencilTest.reference;
+          const reference2 = commands[2].renderState.stencilTest.reference;
+          expect(reference2).toEqual(reference1 + 1);
+        });
+      });
+    });
+
+    it("silhouette works with style", function () {
+      const style = new Cesium3DTileStyle({
+        color: {
+          conditions: [["${height} > 1", "color('red', 0.5)"]],
+        },
+      });
+      return loadAndZoomToModelExperimental(
+        { gltf: buildingsMetadata, silhouetteSize: 1.0 },
+        scene
+      ).then(function (model) {
+        model.style = style;
+        scene.renderForSpecs();
+        const commandList = scene.frameState.commandList;
+        expect(commandList.length).toBe(2);
+        expect(commandList[0].renderState.stencilTest.enabled).toBe(true);
+        expect(commandList[0].pass).toBe(Pass.TRANSLUCENT);
+        expect(commandList[1].renderState.stencilTest.enabled).toBe(true);
+        expect(commandList[1].pass).toBe(Pass.TRANSLUCENT);
       });
     });
 
@@ -1339,7 +2453,6 @@ describe(
         return loadAndZoomToModelExperimental(
           {
             gltf: new Uint8Array(buffer),
-            debugShowBoundingVolume: true,
             scale: 20,
             maximumScale: 10,
           },
@@ -1378,7 +2491,6 @@ describe(
         return loadAndZoomToModelExperimental(
           {
             gltf: new Uint8Array(buffer),
-            debugShowBoundingVolume: true,
             minimumPixelSize: 1,
             maximumScale: 10,
           },
@@ -1419,13 +2531,8 @@ describe(
         },
         scene
       ).then(function (model) {
-        const renderOptions = {
-          scene: scene,
-          time: new JulianDate(2456659.0004050927),
-        };
-
-        expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).toEqual([0, 0, 0, 255]);
+        verifyRender(model, false, {
+          zoomToModel: false,
         });
       });
     });
@@ -1439,13 +2546,8 @@ describe(
         },
         scene
       ).then(function (model) {
-        const renderOptions = {
-          scene: scene,
-          time: new JulianDate(2456659.0004050927),
-        };
-
-        expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).not.toEqual([0, 0, 0, 255]);
+        verifyRender(model, true, {
+          zoomToModel: false,
         });
       });
     });
@@ -1459,19 +2561,14 @@ describe(
         },
         scene
       ).then(function (model) {
-        const renderOptions = {
-          scene: scene,
-          time: new JulianDate(2456659.0004050927),
-        };
-
-        expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).toEqual([0, 0, 0, 255]);
+        verifyRender(model, false, {
+          zoomToModel: false,
         });
 
         model.color = new Color(0, 0, 1.0, 0.5);
 
-        expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).not.toEqual([0, 0, 0, 255]);
+        verifyRender(model, true, {
+          zoomToModel: false,
         });
       });
     });
@@ -1485,19 +2582,14 @@ describe(
         },
         scene
       ).then(function (model) {
-        const renderOptions = {
-          scene: scene,
-          time: new JulianDate(2456659.0004050927),
-        };
-
-        expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).not.toEqual([0, 0, 0, 255]);
+        verifyRender(model, true, {
+          zoomToModel: false,
         });
 
         model.backFaceCulling = true;
 
-        expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).toEqual([0, 0, 0, 255]);
+        verifyRender(model, false, {
+          zoomToModel: false,
         });
       });
     });
@@ -1508,6 +2600,33 @@ describe(
           gltf: boxBackFaceCullingUrl,
           backFaceCulling: false,
           offset: boxBackFaceCullingOffset,
+          color: new Color(0, 0, 1.0, 0.5),
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true, {
+          zoomToModel: false,
+        });
+
+        model.backFaceCulling = true;
+
+        verifyRender(model, true, {
+          zoomToModel: false,
+        });
+
+        model.backFaceCulling = false;
+
+        verifyRender(model, true, {
+          zoomToModel: false,
+        });
+      });
+    });
+
+    it("reverses winding order for negatively scaled models", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: Matrix4.fromUniformScale(-1.0),
         },
         scene
       ).then(function (model) {
@@ -1516,22 +2635,23 @@ describe(
           time: new JulianDate(2456659.0004050927),
         };
 
-        model.color = new Color(0, 0, 1.0, 0.5);
-
+        // The model should look the same whether it has -1.0 scale or 1.0 scale.
+        // The initial scale is -1.0. Test switching this at runtime.
+        let initialRgba;
         expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).not.toEqual([0, 0, 0, 255]);
+          initialRgba = rgba;
         });
 
-        model.backFaceCulling = true;
+        model.modelMatrix = Matrix4.IDENTITY;
 
         expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).not.toEqual([0, 0, 0, 255]);
+          expect(rgba).toEqual(initialRgba);
         });
 
-        model.backFaceCulling = false;
+        model.modelMatrix = Matrix4.fromUniformScale(-1.0);
 
         expect(renderOptions).toRenderAndCall(function (rgba) {
-          expect(rgba).not.toEqual([0, 0, 0, 255]);
+          expect(rgba).toEqual(initialRgba);
         });
       });
     });
@@ -1698,13 +2818,177 @@ describe(
       });
     });
 
+    it("setArticulationStage throws when model is not ready", function () {
+      const model = ModelExperimental.fromGltf({
+        url: boxArticulationsUrl,
+      });
+
+      expect(function () {
+        model.setArticulationStage("SampleArticulation MoveX", 10.0);
+      }).toThrowDeveloperError();
+    });
+
+    it("setArticulationStage throws with invalid value", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        expect(function () {
+          model.setArticulationStage("SampleArticulation MoveX", "bad");
+        }).toThrowDeveloperError();
+      });
+    });
+
+    it("applyArticulations throws when model is not ready", function () {
+      const model = ModelExperimental.fromGltf({
+        url: boxArticulationsUrl,
+      });
+
+      expect(function () {
+        model.applyArticulations();
+      }).toThrowDeveloperError();
+    });
+
+    it("applies articulations", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+
+        model.setArticulationStage("SampleArticulation MoveX", 10.0);
+        model.applyArticulations();
+        verifyRender(model, false);
+
+        model.setArticulationStage("SampleArticulation MoveX", 0.0);
+        model.applyArticulations();
+        verifyRender(model, true);
+
+        model.setArticulationStage("SampleArticulation Size", 0.0);
+        model.applyArticulations();
+        verifyRender(model, false);
+
+        model.setArticulationStage("SampleArticulation Size", 1.0);
+        model.applyArticulations();
+        verifyRender(model, true);
+      });
+    });
+
+    it("getNode throws when model is not ready", function () {
+      const model = ModelExperimental.fromGltf({
+        url: boxArticulationsUrl,
+      });
+
+      expect(function () {
+        model.getNode("Root");
+      }).toThrowDeveloperError();
+    });
+
+    it("getNode throws when name is undefined", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        expect(function () {
+          model.getNode();
+        }).toThrowDeveloperError();
+      });
+    });
+
+    it("getNode returns undefined for nonexistent node", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        const node = model.getNode("I don't exist");
+        expect(node).toBeUndefined();
+      });
+    });
+
+    it("getNode returns a node", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        const node = model.getNode("Root");
+
+        expect(node).toBeDefined();
+        expect(node.name).toEqual("Root");
+        expect(node.id).toEqual(0);
+        expect(node.show).toEqual(true);
+        expect(node.matrix).toEqual(boxArticulationsMatrix);
+        expect(node.originalMatrix).toEqual(boxArticulationsMatrix);
+      });
+    });
+
+    it("changing node.show works", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+        const node = model.getNode("Root");
+        expect(node.show).toEqual(true);
+
+        node.show = false;
+        verifyRender(model, false);
+      });
+    });
+
+    it("changing node.show works", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+        const node = model.getNode("Root");
+        expect(node.show).toEqual(true);
+
+        node.show = false;
+        verifyRender(model, false);
+      });
+    });
+
+    it("changing node.matrix works", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxArticulationsUrl,
+        },
+        scene
+      ).then(function (model) {
+        verifyRender(model, true);
+        const node = model.getNode("Root");
+        expect(node.matrix).toEqual(boxArticulationsMatrix);
+        expect(node.originalMatrix).toEqual(boxArticulationsMatrix);
+
+        node.matrix = Matrix4.fromTranslation(new Cartesian3(10, 0, 0));
+        // The model's bounding sphere doesn't account for animations,
+        // so the camera will not account for the node's new transform.
+        verifyRender(model, false);
+      });
+    });
+
     it("destroy works", function () {
       spyOn(ShaderProgram.prototype, "destroy").and.callThrough();
       return loadAndZoomToModelExperimental(
         { gltf: boxTexturedGlbUrl },
         scene
       ).then(function (model) {
-        const resources = model._resources;
+        const resources = model._pipelineResources;
         const loader = model._loader;
         let resource;
 
@@ -1769,6 +3053,26 @@ describe(
 
         model.clippingPlanes = undefined;
         expect(clippingPlanes.isDestroyed()).toBe(true);
+      });
+    });
+
+    it("destroys height reference callback", function () {
+      return loadAndZoomToModelExperimental(
+        {
+          gltf: boxTexturedGlbUrl,
+          modelMatrix: Transforms.eastNorthUpToFixedFrame(
+            Cartesian3.fromDegrees(-72.0, 40.0)
+          ),
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          scene: sceneWithMockGlobe,
+        },
+        sceneWithMockGlobe
+      ).then(function (model) {
+        expect(sceneWithMockGlobe.globe.callback).toBeDefined();
+
+        sceneWithMockGlobe.primitives.remove(model);
+        expect(model.isDestroyed()).toBe(true);
+        expect(sceneWithMockGlobe.globe.callback).toBeUndefined();
       });
     });
 

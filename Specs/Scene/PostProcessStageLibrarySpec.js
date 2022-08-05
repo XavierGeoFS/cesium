@@ -1,10 +1,13 @@
-import { Cartesian3 } from "../../Source/Cesium.js";
-import { HeadingPitchRange } from "../../Source/Cesium.js";
-import { HeadingPitchRoll } from "../../Source/Cesium.js";
-import { Matrix4 } from "../../Source/Cesium.js";
-import { Transforms } from "../../Source/Cesium.js";
-import { Model } from "../../Source/Cesium.js";
-import { PostProcessStageLibrary } from "../../Source/Cesium.js";
+import {
+  Cartesian3,
+  HeadingPitchRange,
+  HeadingPitchRoll,
+  Matrix4,
+  Transforms,
+  Model,
+  PostProcessStageLibrary,
+} from "../../../Source/Cesium.js";
+
 import createCanvas from "../createCanvas.js";
 import createScene from "../createScene.js";
 import pollToPromise from "../pollToPromise.js";
@@ -50,11 +53,12 @@ describe(
         const camera = scene.camera;
         const center = Matrix4.multiplyByPoint(
           model.modelMatrix,
-          model.boundingSphere.center,
+          model.boundingSphereInternal.center,
           new Cartesian3()
         );
         const r =
-          4.0 * Math.max(model.boundingSphere.radius, camera.frustum.near);
+          4.0 *
+          Math.max(model.boundingSphereInternal.radius, camera.frustum.near);
         camera.lookAt(center, new HeadingPitchRange(0.0, 0.0, r));
       };
 

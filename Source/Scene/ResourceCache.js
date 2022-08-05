@@ -12,6 +12,7 @@ import GltfTextureLoader from "./GltfTextureLoader.js";
 import GltfVertexBufferLoader from "./GltfVertexBufferLoader.js";
 import MetadataSchemaLoader from "./MetadataSchemaLoader.js";
 import ResourceCacheKey from "./ResourceCacheKey.js";
+import ResourceCacheStatistics from "./ResourceCacheStatistics.js";
 
 /**
  * Cache for resources shared across 3D Tiles and glTF.
@@ -23,6 +24,9 @@ import ResourceCacheKey from "./ResourceCacheKey.js";
 function ResourceCache() {}
 
 ResourceCache.cacheEntries = {};
+
+// Statistics about binary data stored in the resource cache
+ResourceCache.statistics = new ResourceCacheStatistics();
 
 /**
  * A reference-counted cache entry.
@@ -37,6 +41,9 @@ ResourceCache.cacheEntries = {};
 function CacheEntry(resourceLoader) {
   this.referenceCount = 1;
   this.resourceLoader = resourceLoader;
+
+  // For unit testing only
+  this._statisticsPromise = undefined;
 }
 
 /**
@@ -122,6 +129,7 @@ ResourceCache.unload = function (resourceLoader) {
   --cacheEntry.referenceCount;
 
   if (cacheEntry.referenceCount === 0) {
+    ResourceCache.statistics.removeLoader(resourceLoader);
     resourceLoader.destroy();
     delete ResourceCache.cacheEntries[cacheKey];
   }
@@ -430,9 +438,9 @@ ResourceCache.loadDraco = function (options) {
  * @param {String} [options.attributeSemantic] The attribute semantic, e.g. POSITION or NORMAL.
  * @param {Number} [options.accessorId] The accessor ID.
  * @param {Boolean} [options.asynchronous=true] Determines if WebGL resource creation will be spread out over several frames or block until all WebGL resources are created.
- * @param {Boolean} [dequantize=false] Determines whether or not the vertex buffer will be dequantized on the CPU.
- * @param {Boolean} [loadAsTypedArray=false] Load vertex buffer as a typed array instead of a GPU vertex buffer.
- *
+ * @param {Boolean} [options.dequantize=false] Determines whether or not the vertex buffer will be dequantized on the CPU.
+ * @param {Boolean} [options.loadBuffer=false] Load vertex buffer as a GPU vertex buffer.
+ * @param {Boolean} [options.loadTypedArray=false] Load vertex buffer as a typed array.
  * @exception {DeveloperError} One of options.bufferViewId and options.draco must be defined.
  * @exception {DeveloperError} When options.draco is defined options.attributeSemantic must also be defined.
  * @exception {DeveloperError} When options.draco is defined options.accessorId must also be defined.
@@ -451,12 +459,18 @@ ResourceCache.loadVertexBuffer = function (options) {
   const accessorId = options.accessorId;
   const asynchronous = defaultValue(options.asynchronous, true);
   const dequantize = defaultValue(options.dequantize, false);
-  const loadAsTypedArray = defaultValue(options.loadAsTypedArray, false);
+  const loadBuffer = defaultValue(options.loadBuffer, false);
+  const loadTypedArray = defaultValue(options.loadTypedArray, false);
 
   //>>includeStart('debug', pragmas.debug);
   Check.typeOf.object("options.gltf", gltf);
   Check.typeOf.object("options.gltfResource", gltfResource);
   Check.typeOf.object("options.baseResource", baseResource);
+  if (!loadBuffer && !loadTypedArray) {
+    throw new DeveloperError(
+      "At least one of loadBuffer and loadTypedArray must be true."
+    );
+  }
 
   const hasBufferViewId = defined(bufferViewId);
   const hasDraco = defined(draco);
@@ -496,7 +510,8 @@ ResourceCache.loadVertexBuffer = function (options) {
     draco: draco,
     attributeSemantic: attributeSemantic,
     dequantize: dequantize,
-    loadAsTypedArray: loadAsTypedArray,
+    loadBuffer: loadBuffer,
+    loadTypedArray: loadTypedArray,
   });
 
   let vertexBufferLoader = ResourceCache.get(cacheKey);
@@ -516,12 +531,20 @@ ResourceCache.loadVertexBuffer = function (options) {
     cacheKey: cacheKey,
     asynchronous: asynchronous,
     dequantize: dequantize,
-    loadAsTypedArray: loadAsTypedArray,
+    loadBuffer: loadBuffer,
+    loadTypedArray: loadTypedArray,
   });
 
   ResourceCache.load({
     resourceLoader: vertexBufferLoader,
   });
+
+  const promise = ResourceCache.statistics.addGeometryLoader(
+    vertexBufferLoader
+  );
+
+  // Needed for unit testing
+  ResourceCache.cacheEntries[cacheKey]._statisticsPromise = promise;
 
   return vertexBufferLoader;
 };
@@ -536,8 +559,8 @@ ResourceCache.loadVertexBuffer = function (options) {
  * @param {Resource} options.baseResource The {@link Resource} that paths in the glTF JSON are relative to.
  * @param {Object} [options.draco] The Draco extension object.
  * @param {Boolean} [options.asynchronous=true] Determines if WebGL resource creation will be spread out over several frames or block until all WebGL resources are created.
- * @param {Boolean} [options.loadAsTypedArray=false] Load index buffer as a typed array instead of a GPU index buffer.
- * @param {Boolean} [options.loadForWireframe=false] Load index buffer as a typed array in order to generate wireframes in WebGL1. This will be ignored if using WebGL2.
+ * @param {Boolean} [options.loadBuffer=false] Load index buffer as a GPU index buffer.
+ * @param {Boolean} [options.loadTypedArray=false] Load index buffer as a typed array.
  * @returns {GltfIndexBufferLoader} The index buffer loader.
  * @private
  */
@@ -549,14 +572,19 @@ ResourceCache.loadIndexBuffer = function (options) {
   const baseResource = options.baseResource;
   const draco = options.draco;
   const asynchronous = defaultValue(options.asynchronous, true);
-  const loadAsTypedArray = defaultValue(options.loadAsTypedArray, false);
-  const loadForWireframe = defaultValue(options.loadForWireframe, false);
+  const loadBuffer = defaultValue(options.loadBuffer, false);
+  const loadTypedArray = defaultValue(options.loadTypedArray, false);
 
   //>>includeStart('debug', pragmas.debug);
   Check.typeOf.object("options.gltf", gltf);
   Check.typeOf.number("options.accessorId", accessorId);
   Check.typeOf.object("options.gltfResource", gltfResource);
   Check.typeOf.object("options.baseResource", baseResource);
+  if (!loadBuffer && !loadTypedArray) {
+    throw new DeveloperError(
+      "At least one of loadBuffer and loadTypedArray must be true."
+    );
+  }
   //>>includeEnd('debug');
 
   const cacheKey = ResourceCacheKey.getIndexBufferCacheKey({
@@ -565,7 +593,8 @@ ResourceCache.loadIndexBuffer = function (options) {
     gltfResource: gltfResource,
     baseResource: baseResource,
     draco: draco,
-    loadAsTypedArray: loadAsTypedArray,
+    loadBuffer: loadBuffer,
+    loadTypedArray: loadTypedArray,
   });
 
   let indexBufferLoader = ResourceCache.get(cacheKey);
@@ -582,13 +611,17 @@ ResourceCache.loadIndexBuffer = function (options) {
     draco: draco,
     cacheKey: cacheKey,
     asynchronous: asynchronous,
-    loadAsTypedArray: loadAsTypedArray,
-    loadForWireframe: loadForWireframe,
+    loadBuffer: loadBuffer,
+    loadTypedArray: loadTypedArray,
   });
 
   ResourceCache.load({
     resourceLoader: indexBufferLoader,
   });
+  const promise = ResourceCache.statistics.addGeometryLoader(indexBufferLoader);
+
+  // Needed for unit testing
+  ResourceCache.cacheEntries[cacheKey]._statisticsPromise = promise;
 
   return indexBufferLoader;
 };
@@ -704,6 +737,10 @@ ResourceCache.loadTexture = function (options) {
   ResourceCache.load({
     resourceLoader: textureLoader,
   });
+  const promise = ResourceCache.statistics.addTextureLoader(textureLoader);
+
+  // Needed for unit testing
+  ResourceCache.cacheEntries[cacheKey]._statisticsPromise = promise;
 
   return textureLoader;
 };
@@ -753,6 +790,8 @@ ResourceCache.clearForSpecs = function () {
       delete cacheEntries[cacheKey];
     }
   }
+
+  ResourceCache.statistics.clear();
 };
 
 export default ResourceCache;

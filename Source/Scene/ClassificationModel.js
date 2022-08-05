@@ -1,4 +1,3 @@
-import arraySlice from "../Core/arraySlice.js";
 import BoundingSphere from "../Core/BoundingSphere.js";
 import Cartesian3 from "../Core/Cartesian3.js";
 import Cartesian4 from "../Core/Cartesian4.js";
@@ -6,7 +5,6 @@ import Color from "../Core/Color.js";
 import combine from "../Core/combine.js";
 import ComponentDatatype from "../Core/ComponentDatatype.js";
 import defaultValue from "../Core/defaultValue.js";
-import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import destroyObject from "../Core/destroyObject.js";
 import DeveloperError from "../Core/DeveloperError.js";
@@ -155,7 +153,15 @@ function ClassificationModel(options) {
   this._modelMatrix = Matrix4.clone(this.modelMatrix);
 
   this._ready = false;
-  this._readyPromise = defer();
+  const classificationModel = this;
+  this._readyPromise = new Promise((resolve) => {
+    classificationModel._completeLoad = (frameState) => {
+      frameState.afterRender.push(function () {
+        classificationModel._ready = true;
+        resolve(classificationModel);
+      });
+    };
+  });
 
   /**
    * This property is for debugging only; it is not for production use nor is it optimized.
@@ -249,6 +255,18 @@ Object.defineProperties(ClassificationModel.prototype, {
   },
 
   /**
+   * For compatibility with Model which now uses gltfInternal to avoid
+   * deprecation noise.
+   *
+   * @private
+   */
+  gltfInternal: {
+    get: function () {
+      return this._gltf;
+    },
+  },
+
+  /**
    * The model's bounding sphere in its local coordinate system.
    *
    * @memberof ClassificationModel.prototype
@@ -334,7 +352,7 @@ Object.defineProperties(ClassificationModel.prototype, {
    */
   readyPromise: {
     get: function () {
-      return this._readyPromise.promise;
+      return this._readyPromise;
     },
   },
 
@@ -849,9 +867,9 @@ function createPrimitive(model) {
     );
   }
 
-  positionsBuffer = arraySlice(positionsBuffer);
-  vertexBatchIds = arraySlice(vertexBatchIds);
-  indices = arraySlice(indices, offset, offset + count);
+  positionsBuffer = positionsBuffer.slice();
+  vertexBatchIds = vertexBatchIds.slice();
+  indices = indices.slice(offset, offset + count);
 
   const batchIds = [];
   const indexCounts = [];
@@ -993,7 +1011,7 @@ function updateNodeModelMatrix(
       );
       model._rtcCenter = model._rtcCenter3D;
     } else {
-      const center = model.boundingSphere.center;
+      const center = model.boundingSphereInternal.center;
       const to2D = Transforms.wgs84To2DModelMatrix(
         projection,
         center,
@@ -1172,11 +1190,7 @@ ClassificationModel.prototype.update = function (frameState) {
 
   if (justLoaded) {
     // Called after modelMatrix update.
-    const model = this;
-    frameState.afterRender.push(function () {
-      model._ready = true;
-      model._readyPromise.resolve(model);
-    });
+    this._completeLoad(frameState);
     return;
   }
 

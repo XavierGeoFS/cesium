@@ -1,15 +1,17 @@
-import { arrayFill } from "../Source/Cesium.js";
-import { Cartesian2 } from "../Source/Cesium.js";
-import { Color } from "../Source/Cesium.js";
-import { defaultValue } from "../Source/Cesium.js";
-import { defined } from "../Source/Cesium.js";
-import { JulianDate } from "../Source/Cesium.js";
-import { ImageBasedLighting } from "../Source/Cesium.js";
-import { Resource } from "../Source/Cesium.js";
-import { Cesium3DTileContentFactory } from "../Source/Cesium.js";
-import { Cesium3DTileset } from "../Source/Cesium.js";
-import { TileBoundingSphere } from "../Source/Cesium.js";
-import { RuntimeError } from "../Source/Cesium.js";
+import {
+  Cartesian2,
+  Color,
+  defaultValue,
+  defined,
+  JulianDate,
+  ImageBasedLighting,
+  Resource,
+  Cesium3DTileContentFactory,
+  Cesium3DTileset,
+  TileBoundingSphere,
+  RuntimeError,
+} from "../../Source/Cesium.js";
+
 import pollToPromise from "./pollToPromise.js";
 
 const mockTile = {
@@ -121,8 +123,9 @@ Cesium3DTilesTester.loadTileset = function (scene, url, options) {
   );
   // Load all visible tiles
   const tileset = scene.primitives.add(new Cesium3DTileset(options));
-
-  return Cesium3DTilesTester.waitForTilesLoaded(scene, tileset);
+  return tileset.readyPromise.then(function () {
+    return Cesium3DTilesTester.waitForTilesLoaded(scene, tileset);
+  });
 };
 
 Cesium3DTilesTester.loadTileExpectError = function (scene, arrayBuffer, type) {
@@ -273,7 +276,7 @@ Cesium3DTilesTester.generateInstancedTileBuffer = function (options) {
     const featuresLength = defaultValue(options.featuresLength, 1);
     featureTableJsonString = JSON.stringify({
       INSTANCES_LENGTH: featuresLength,
-      POSITION: arrayFill(new Array(featuresLength * 3), 0),
+      POSITION: new Array(featuresLength * 3).fill(0),
     });
   }
   featureTableJsonString = padStringToByteAlignment(featureTableJsonString, 8);

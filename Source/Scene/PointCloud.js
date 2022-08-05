@@ -7,7 +7,6 @@ import Color from "../Core/Color.js";
 import combine from "../Core/combine.js";
 import ComponentDatatype from "../Core/ComponentDatatype.js";
 import defaultValue from "../Core/defaultValue.js";
-import defer from "../Core/defer.js";
 import defined from "../Core/defined.js";
 import destroyObject from "../Core/destroyObject.js";
 import CesiumMath from "../Core/Math.js";
@@ -108,7 +107,6 @@ function PointCloud(options) {
   this._mode = undefined;
 
   this._ready = false;
-  this._readyPromise = defer();
   this._pointsLength = 0;
   this._geometryByteLength = 0;
 
@@ -159,7 +157,9 @@ function PointCloud(options) {
   );
   this._splittingEnabled = false;
 
-  initialize(this, options);
+  this._resolveReadyPromise = undefined;
+  this._rejectReadyPromise = undefined;
+  this._readyPromise = initialize(this, options);
 }
 
 Object.defineProperties(PointCloud.prototype, {
@@ -183,7 +183,7 @@ Object.defineProperties(PointCloud.prototype, {
 
   readyPromise: {
     get: function () {
-      return this._readyPromise.promise;
+      return this._readyPromise;
     },
   },
 
@@ -284,6 +284,14 @@ function initialize(pointCloud, options) {
   }
 
   pointCloud._pointsLength = parsedContent.pointsLength;
+
+  return new Promise(function (resolve, reject) {
+    pointCloud._resolveReadyPromise = function () {
+      pointCloud._ready = true;
+      resolve(pointCloud);
+    };
+    pointCloud._rejectReadyPromise = reject;
+  });
 }
 
 const scratchMin = new Cartesian3();
@@ -952,7 +960,10 @@ function createShaders(pointCloud, frameState, style) {
     "uniform vec4 u_pointSizeAndTimeAndGeometricErrorAndDepthMultiplier; \n" +
     "uniform vec4 u_constantColor; \n" +
     "uniform vec4 u_highlightColor; \n";
-  vs += "float u_pointSize; \n" + "float u_time; \n";
+
+  // The time variable is named differently for compatibility with custom
+  // shaders in ModelExperimental.
+  vs += "float u_pointSize; \n" + "float tiles3d_tileset_time; \n";
 
   if (attenuation) {
     vs += "float u_geometricError; \n" + "float u_depthMultiplier; \n";
@@ -1008,7 +1019,7 @@ function createShaders(pointCloud, frameState, style) {
     "void main() \n" +
     "{ \n" +
     "    u_pointSize = u_pointSizeAndTimeAndGeometricErrorAndDepthMultiplier.x; \n" +
-    "    u_time = u_pointSizeAndTimeAndGeometricErrorAndDepthMultiplier.y; \n";
+    "    tiles3d_tileset_time = u_pointSizeAndTimeAndGeometricErrorAndDepthMultiplier.y; \n";
 
   if (attenuation) {
     vs +=
@@ -1270,7 +1281,7 @@ function decodeDraco(pointCloud, context) {
         })
         .catch(function (error) {
           pointCloud._decodingState = DecodingState.FAILED;
-          pointCloud._readyPromise.reject(error);
+          pointCloud._rejectReadyPromise(error);
         });
     }
   }
@@ -1299,8 +1310,7 @@ PointCloud.prototype.update = function (frameState) {
     createResources(this, frameState);
     modelMatrixDirty = true;
     shadersDirty = true;
-    this._ready = true;
-    this._readyPromise.resolve(this);
+    this._resolveReadyPromise();
     this._parsedContent = undefined; // Unload
   }
 
